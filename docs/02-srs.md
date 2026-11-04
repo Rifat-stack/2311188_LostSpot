@@ -4,8 +4,8 @@
 |---|---|
 | **Product** | LostSpot |
 | **Document** | Software Requirements Specification (SRS) |
-| **Version** | 1.0 |
-| **Date** | 13 October 2026 |
+| **Version** | 1.1 |
+| **Date** | 4 November 2026 |
 | **Author** | Rifat |
 | **Related docs** | [PRD](01-prd.md) · [TDD](03-tdd.md) |
 
@@ -19,7 +19,7 @@ This document lists what LostSpot must do (functional requirements) and how well
 
 ### 1.2 Scope
 
-LostSpot is a web app where people post lost and found items on a building floor map. The MVP covers posting, browsing, filtering, reporting found and resolving, without accounts. Beta adds accounts, roles, claims with a verification question, match suggestions, photos and admin tools. Out of scope: automated tests, CI/CD, native apps, notifications, chat, indoor positioning.
+LostSpot is a web app where people post lost and found items with where and when they happened. The MVP covers item CRUD (create, list, view, update including resolve, delete) without accounts. Beta adds accounts, roles, building floor maps with pins and areas, claims with a verification question, match suggestions, photos and admin tools. Out of scope: automated tests, CI/CD, native apps, notifications, chat, indoor positioning.
 
 ### 1.3 Definitions
 
@@ -31,12 +31,15 @@ LostSpot is a web app where people post lost and found items on a building floor
 | **Refresh token** | A long-lived token used to get a new access token without logging in again. |
 | **RBAC** | Role-based access control. What a user can do depends on their role. |
 | **Item** | A lost or found post. Its `type` is `lost` or `found`. |
-| **Pin** | An exact point on a floor plan, stored as `x` and `y` between 0 and 1. |
-| **Lost area** | A circle on the floor plan (centre `x`, `y` and `radius`) showing where the owner thinks the item was lost. |
-| **Found report** | A note from someone saying they found a lost item (MVP). |
+| **Location** | Free text saying where the item was lost or found, for example "CSE Building, Floor 2, near Lab 1" (MVP). |
+| **Event date** | The day the item was lost or found (`event_date`). |
+| **Resolved** | The item is back with its owner (`is_resolved = true`). |
+| **UUID** | A random 128-bit id, used as the item id so ids can't be guessed. |
+| **Pin** | An exact point on a floor plan, stored as `x` and `y` between 0 and 1 (Beta). |
+| **Lost area** | A circle on the floor plan (centre `x`, `y` and `radius`) showing where the owner thinks the item was lost (Beta). |
+| **Found report** | A note from someone saying they found a lost item (Beta). |
 | **Claim** | A request from a user saying a found item is theirs, with an answer to the verification question (Beta). |
 | **Match** | A found item that fits a lost item by floor, category, area and time (Beta). |
-| **Edit key** | A random secret given once when a post is created in the MVP. It is needed to edit, delete, resolve or reopen that post. |
 | **Owner / poster** | The person who created a post. |
 
 ### 1.4 Roles
@@ -57,14 +60,14 @@ LostSpot is a web app where people post lost and found items on a building floor
 flowchart LR
     G((Guest))
     subgraph MVP["LostSpot MVP"]
-        UC1([Browse floor map])
-        UC2([Search and filter items])
-        UC3([View item details])
-        UC4([Post lost item with area])
-        UC5([Post found item with pin])
-        UC6([Report lost item as found])
-        UC7([Edit or delete post with edit key])
-        UC8([Resolve or reopen post with edit key])
+        UC1([Post lost or found item])
+        UC2([List items])
+        UC3([Filter lost / found, hide resolved])
+        UC4([View item details])
+        UC5([Edit item])
+        UC6([Mark resolved or open])
+        UC7([Delete item])
+        UC8([Clear resolved items])
     end
     G --> UC1
     G --> UC2
@@ -114,8 +117,11 @@ An admin can also do everything a user can.
 
 ### 2.3 Item status
 
+In the MVP an item is either open or resolved (`is_resolved`), and either can be changed back. The full status flow below arrives in Beta.
+
 ```mermaid
 stateDiagram-v2
+    %% Beta status flow
     [*] --> open: item posted
     open --> found_reported: someone reports a lost item as found
     found_reported --> open: owner rejects the report
@@ -143,20 +149,20 @@ stateDiagram-v2
 
 | ID | Requirement | Release | Story |
 |---|---|---|---|
-| FR-01 | The system shall list all buildings. | MVP | US-04 |
-| FR-02 | The system shall list the floors of a building, each with its floor plan image and size. | MVP | US-04 |
-| FR-03 | A guest shall be able to create a **lost** item with title, category, description, floor, lost area (`x`, `y`, `radius`), time window (`time_from`, `time_to`) and optional contact. | MVP | US-01, US-02 |
-| FR-04 | A guest shall be able to create a **found** item with title, category, description, floor, exact pin (`x`, `y`), time found (`time_from`), handoff note and optional contact. | MVP | US-03 |
-| FR-05 | On creation the system shall return a random edit key once, and store only its hash. | MVP | US-08 |
-| FR-06 | The system shall show items of the selected floor on its map: found items as pins, lost items as circles. Only `open` and `found_reported` items are shown by default. | MVP | US-04 |
-| FR-07 | The system shall list items with filters for `type`, `category`, `building_id`, `floor_id`, `status`, date range and a text search on title and description, with pagination. | MVP | US-05 |
-| FR-08 | The system shall return the full details of a single item. | MVP | US-06 |
-| FR-09 | A guest shall be able to report an `open` lost item as found with a note. The item moves to `found_reported`. | MVP | US-07 |
-| FR-10 | With a valid edit key, the poster shall be able to update their item's fields. | MVP | US-08 |
-| FR-11 | With a valid edit key, the poster shall be able to delete their item. | MVP | US-08 |
-| FR-12 | With a valid edit key, the poster shall be able to mark their item `resolved`. | MVP | US-09 |
-| FR-13 | With a valid edit key, the poster shall be able to move a `found_reported` item back to `open` and clear the found report. | MVP | US-09 |
-| FR-14 | The system shall provide a seed script that creates at least one building with two floors and their floor plans. | MVP | US-04 |
+| FR-01 | A guest shall be able to create an item with `type` (`lost` or `found`), `title`, `location` and `event_date`, plus an optional `description` and `contact`. The system returns `201` with the new item. | MVP | US-01, US-02 |
+| FR-02 | A new item shall get a random UUID id, `is_resolved = false`, and `created_at` and `updated_at` set to the current time. | MVP | US-01, US-02 |
+| FR-03 | The system shall reject an `event_date` in the future with `409`. | MVP | US-01, US-02, US-05 |
+| FR-04 | The system shall list items newest first, with `offset` and `limit` (1 to 100, default 20), and return the `total` number of items. | MVP | US-03, US-09 |
+| FR-05 | The system shall return one item by id, or `404` with "Item not found". | MVP | US-04 |
+| FR-06 | A guest shall be able to update an item. Only the fields sent are changed, and `updated_at` is set to the current time. | MVP | US-05 |
+| FR-07 | A guest shall be able to mark an item resolved or open again by updating `is_resolved`. | MVP | US-06 |
+| FR-08 | A guest shall be able to delete an item. The system returns `204`, or `404` if it doesn't exist. | MVP | US-07 |
+| FR-09 | The frontend shall filter the list by type (all, lost, found) and hide or show resolved items. | MVP | US-03, US-08 |
+| FR-10 | The frontend shall delete all resolved items in the list with one "Clear resolved" action, after a confirmation. | MVP | US-08 |
+| FR-11 | The frontend shall load the next page of items with a "Load more" button while more items exist. | MVP | US-09 |
+| FR-12 | Invalid input shall return `422` with the field and the reason. | MVP | US-01, US-05 |
+| FR-13 | Items shall be stored in Supabase PostgreSQL in production and in a SQLite file locally. | MVP | US-03 |
+| FR-14 | Interactive API docs shall be served at `/api/docs`. | MVP | – |
 
 ### 3.2 Beta
 
@@ -169,7 +175,7 @@ stateDiagram-v2
 | FR-19 | A user shall be able to view their profile and change their name. | Beta | US-12 |
 | FR-20 | A user shall be able to change their password by giving the current one. All their refresh tokens are revoked afterwards. | Beta | US-12 |
 | FR-21 | A user shall be able to list all their own items. | Beta | US-13 |
-| FR-22 | Creating an item shall require login. The item's `owner_id` replaces the edit key; edit, delete, resolve and reopen are allowed for the owner or an admin. | Beta | US-13 |
+| FR-22 | Creating an item shall require login. The item gets an `owner_id`; edit, delete, resolve and reopen are allowed for the owner or an admin. | Beta | US-13 |
 | FR-23 | The owner shall be able to upload one photo per item (JPEG, PNG or WebP, max 2 MB). | Beta | US-17 |
 | FR-24 | When posting a found item, the finder may add a verification question and a secret answer. The secret answer is shown only to the finder and admins. | Beta | US-14 |
 | FR-25 | A user who is not the finder shall be able to submit one claim per found item, with an answer and a short message. | Beta | US-14 |
@@ -182,21 +188,24 @@ stateDiagram-v2
 | FR-32 | An admin shall be able to list users and ban or unban them. A banned user cannot log in, refresh tokens or post. | Beta | US-20 |
 | FR-33 | An admin shall be able to create buildings and add floors with a floor plan image. | Beta | US-21 |
 | FR-34 | The system shall enforce the permission matrix in section 6 on every Beta endpoint. | Beta | US-18 – US-21 |
+| FR-35 | The system shall list buildings and their floors, each with a floor plan image and size. | Beta | US-23 |
+| FR-36 | A lost item shall have an area (`x`, `y`, `radius`) and a found item a pin (`x`, `y`) on a floor, set by clicking the floor plan. | Beta | US-22 |
+| FR-37 | The system shall show the open items of a floor on its map: found items as pins, lost items as circles. | Beta | US-23 |
 
 ## 4. Non-functional requirements
 
 | ID | Category | Requirement | Release |
 |---|---|---|---|
-| NFR-01 | Performance | Item list and map endpoints respond in under 500 ms (p95) for up to 1,000 items, not counting serverless cold starts. | MVP |
-| NFR-02 | Performance | The floor map with its pins renders in under 2 seconds on a normal connection. | MVP |
-| NFR-03 | Usability | Posting an item takes at most 5 steps and under a minute for a first-time user. | MVP |
+| NFR-01 | Performance | The item list endpoint responds in under 500 ms (p95) for up to 1,000 items, not counting serverless cold starts. | MVP |
+| NFR-02 | Performance | The item list page loads in under 2 seconds on a normal connection. | MVP |
+| NFR-03 | Usability | Posting an item takes one form and under a minute for a first-time user. | MVP |
 | NFR-04 | Usability | The UI works on screens from 360 px wide (phones) to desktop. | MVP |
-| NFR-05 | Security | Edit keys are random (at least 128 bits), shown once, and stored only as a SHA-256 hash. | MVP |
+| NFR-05 | Security | Item ids are random UUIDs, so they can't be guessed by counting. | MVP |
 | NFR-06 | Security | All traffic is served over HTTPS. | MVP |
 | NFR-07 | Security | Secrets (database URL, JWT secret, storage keys) are stored in environment variables and never committed to Git. | MVP |
-| NFR-08 | Security | All input is validated on the server; invalid input returns `422`. | MVP |
-| NFR-09 | Maintainability | Backend code is split into routers, services, models and schemas. OpenAPI docs are served at `/api/docs`. | MVP |
-| NFR-10 | Privacy | In the MVP, the post form warns that contact details are public. Contact is optional. | MVP |
+| NFR-08 | Security | All input is validated on the server; invalid input returns `422`. Errors never include stack traces or database details. | MVP |
+| NFR-09 | Maintainability | Backend code is organised by feature, with router, service, repository, models and schemas. OpenAPI docs are served at `/api/docs`. | MVP |
+| NFR-10 | Privacy | The post form says that contact details are shown publicly. Contact is optional. | MVP |
 | NFR-11 | Security | Passwords are hashed with Argon2id. | Beta |
 | NFR-12 | Security | Access tokens expire after 15 minutes; refresh tokens after 7 days and are rotated on use. | Beta |
 | NFR-13 | Security | After 5 failed logins an account is locked for 15 minutes. | Beta |
@@ -209,19 +218,19 @@ stateDiagram-v2
 
 | Field | Rule | Release |
 |---|---|---|
-| `type` | `lost` or `found` | MVP |
-| `title` | 3 to 80 characters | MVP |
-| `description` | Up to 500 characters | MVP |
-| `category` | One of `keys`, `phone`, `wallet`, `id_card`, `bag`, `electronics`, `clothing`, `bottle`, `books`, `other` | MVP |
-| `floor_id` | Must exist | MVP |
-| `x`, `y` | Number from 0 to 1 | MVP |
-| `radius` | Required for lost items, from 0.01 to 0.5. Must be empty for found items. | MVP |
-| `time_from` | Required. Not more than 5 minutes in the future. | MVP |
-| `time_to` | Required for lost items, must be ≥ `time_from` and at most 7 days after it. Must be empty for found items. | MVP |
-| `handoff_note` | Required for found items, up to 200 characters | MVP |
-| `contact` | Optional, up to 100 characters | MVP |
-| Found report `note` | 3 to 300 characters | MVP |
-| `X-Edit-Key` header | Required for edit, delete, resolve, reopen in MVP | MVP |
+| `type` | `lost` or `found`; required on create, can't be null on update | MVP |
+| `title` | 1 to 200 characters after trimming spaces; required | MVP |
+| `location` | 1 to 200 characters after trimming spaces; required | MVP |
+| `event_date` | A date (`YYYY-MM-DD`), not in the future (`409`); required | MVP |
+| `description` | Optional, up to 1000 characters; can be cleared with `null` | MVP |
+| `contact` | Optional, up to 100 characters; can be cleared with `null` | MVP |
+| `is_resolved` | `true` or `false`; update only, can't be null | MVP |
+| `offset`, `limit` | `offset` ≥ 0; `limit` from 1 to 100, default 20 | MVP |
+| Item id in the path | A valid UUID (`422` otherwise) | MVP |
+| `category` | One of `keys`, `phone`, `wallet`, `id_card`, `bag`, `electronics`, `clothing`, `bottle`, `books`, `other` | Beta |
+| `floor_id` | Must exist | Beta |
+| `x`, `y` | Number from 0 to 1 | Beta |
+| `radius` | Required for lost items, from 0.01 to 0.5. Must be empty for found items. | Beta |
 | `email` | Valid email ending in an allowed domain (`ALLOWED_EMAIL_DOMAINS`) | Beta |
 | `password` | At least 8 characters with at least one letter and one digit | Beta |
 | `name` | 2 to 60 characters | Beta |
@@ -263,9 +272,9 @@ stateDiagram-v2
 | `204 No Content` | Successful delete or logout |
 | `400 Bad Request` | Request is well formed but not allowed by a rule (for example claiming your own item) |
 | `401 Unauthorized` | Missing or invalid token (Beta) |
-| `403 Forbidden` | Wrong edit key, wrong role, not the owner, or banned user |
+| `403 Forbidden` | Wrong role, not the owner, or banned user (Beta) |
 | `404 Not Found` | Item, building, floor, claim or user does not exist (or is `removed`, for non-admins) |
-| `409 Conflict` | Invalid status change (for example resolving a `resolved` item) or email already registered |
+| `409 Conflict` | A business rule is broken (MVP: date in the future), or email already registered (Beta) |
 | `413 Payload Too Large` | Photo larger than 2 MB |
 | `422 Unprocessable Entity` | Validation failed |
 | `429 Too Many Requests` | Rate limit hit or account locked after failed logins |
@@ -275,14 +284,14 @@ stateDiagram-v2
 
 | ID | Given | When | Then | Covers |
 |---|---|---|---|---|
-| AC-01 | A floor exists | A guest posts a lost item with a valid area and time window | `201` is returned with the item and an edit key, and the item appears as a circle on that floor | FR-03, FR-05, FR-06 |
-| AC-02 | A floor exists | A guest posts a found item with a pin and a handoff note | `201` is returned and the item appears as a pin on that floor | FR-04, FR-06 |
-| AC-03 | A guest is posting a lost item | `time_to` is earlier than `time_from` | `422` is returned and nothing is saved | FR-03 |
-| AC-04 | Items exist in two buildings | A guest filters by one building and category `keys` | Only matching items from that building are returned | FR-07 |
-| AC-05 | A lost item is `open` | A guest reports it as found with a note | Status becomes `found_reported` and the note is shown on the item | FR-09 |
-| AC-06 | An item exists | A request to edit it has a wrong edit key | `403` is returned and the item is unchanged | FR-10 |
-| AC-07 | A lost item is `found_reported` | The poster reopens it with the correct edit key | Status goes back to `open` and the found report is cleared | FR-13 |
-| AC-08 | An item is `resolved` | Anyone tries to resolve it again | `409` is returned | FR-12 |
+| AC-01 | The app is open | A guest posts a lost item with a title, location and today's date | `201` is returned and the item appears at the top of the list as open | FR-01, FR-02, FR-04 |
+| AC-02 | The app is open | A guest posts an item with an empty title or location | `422` is returned and nothing is saved | FR-12 |
+| AC-03 | The app is open | A guest posts an item dated three days from now | `409` is returned with "The date lost or found cannot be in the future" | FR-03 |
+| AC-04 | An item exists | A guest opens its details page | All its fields are shown | FR-05 |
+| AC-05 | An item exists | A guest changes only its title | The title changes, other fields stay the same, and `updated_at` is newer | FR-06 |
+| AC-06 | An open item exists | A guest ticks it as resolved | `is_resolved` becomes `true` and it disappears when "Show resolved" is off | FR-07, FR-09 |
+| AC-07 | An item exists | A guest deletes it, then requests it again | The delete returns `204` and the request returns `404` | FR-05, FR-08 |
+| AC-08 | 25 items exist | A guest opens the list and clicks "Load more" | 20 items are shown first, then all 25 | FR-04, FR-11 |
 | AC-09 | A guest registers | The email is not from an allowed domain | `422` is returned and no account is created | FR-15 |
 | AC-10 | A user has a valid refresh token | They call refresh | A new token pair is returned and the old refresh token no longer works | FR-17 |
 | AC-11 | A user fails login 5 times | They try again with the right password | `429` is returned until 15 minutes have passed | FR-16, NFR-13 |
@@ -297,15 +306,15 @@ stateDiagram-v2
 
 | Story | Requirements | Endpoint(s) |
 |---|---|---|
-| US-01 | FR-03 | `POST /api/v1/items` |
-| US-02 | FR-03 | `POST /api/v1/items` |
-| US-03 | FR-04 | `POST /api/v1/items` |
-| US-04 | FR-01, FR-02, FR-06, FR-14 | `GET /api/v1/buildings`, `GET /api/v1/buildings/{id}/floors`, `GET /api/v1/items?floor_id=` |
-| US-05 | FR-07 | `GET /api/v1/items` |
-| US-06 | FR-08 | `GET /api/v1/items/{id}` |
-| US-07 | FR-09 | `POST /api/v1/items/{id}/found-report` |
-| US-08 | FR-05, FR-10, FR-11 | `PATCH /api/v1/items/{id}`, `DELETE /api/v1/items/{id}` |
-| US-09 | FR-12, FR-13 | `POST /api/v1/items/{id}/resolve`, `POST /api/v1/items/{id}/reopen` |
+| US-01 | FR-01, FR-02, FR-03, FR-12 | `POST /api/v1/items` |
+| US-02 | FR-01, FR-02, FR-03 | `POST /api/v1/items` |
+| US-03 | FR-04, FR-09, FR-13 | `GET /api/v1/items` |
+| US-04 | FR-05 | `GET /api/v1/items/{id}` |
+| US-05 | FR-03, FR-06, FR-12 | `PATCH /api/v1/items/{id}` |
+| US-06 | FR-07 | `PATCH /api/v1/items/{id}` |
+| US-07 | FR-08 | `DELETE /api/v1/items/{id}` |
+| US-08 | FR-09, FR-10 | `DELETE /api/v1/items/{id}` (once per resolved item) |
+| US-09 | FR-04, FR-11 | `GET /api/v1/items?offset=&limit=` |
 | US-10 | FR-15 | `POST /api/v1/auth/register` |
 | US-11 | FR-16, FR-17, FR-18 | `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout` |
 | US-12 | FR-19, FR-20 | `GET /api/v1/users/me`, `PATCH /api/v1/users/me`, `POST /api/v1/users/me/password` |
@@ -318,3 +327,5 @@ stateDiagram-v2
 | US-19 | FR-31, FR-34 | `DELETE /api/v1/admin/items/{id}` |
 | US-20 | FR-32, FR-34 | `GET /api/v1/admin/users`, `POST /api/v1/admin/users/{id}/ban`, `POST /api/v1/admin/users/{id}/unban` |
 | US-21 | FR-33, FR-34 | `POST /api/v1/admin/buildings`, `POST /api/v1/admin/buildings/{id}/floors` |
+| US-22 | FR-36 | `POST /api/v1/items`, `PATCH /api/v1/items/{id}` |
+| US-23 | FR-35, FR-37 | `GET /api/v1/buildings`, `GET /api/v1/buildings/{id}/floors`, `GET /api/v1/items?floor_id=` |
