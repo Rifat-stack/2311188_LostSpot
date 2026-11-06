@@ -1,44 +1,48 @@
-# Business rules for items (date check, updated_at); called by the router, stores data via the repository.
-import uuid
+"""
+The rules of LostSpot.
+
+The router calls these functions. They check the rules, then use the repository to save.
+Rule: the day something was lost or found cannot be in the future.
+"""
+
 from datetime import date, timedelta
 
-from app.items.models import Item, utc_now
-from app.items.repository import ItemRepository
-from app.items.schemas import ItemCreate, ItemPage, ItemUpdate
+from fastapi import HTTPException
+from sqlmodel import Session
+
+from app.items import repository
+from app.items.models import Item, now_utc
+from app.items.schemas import ItemCreate, ItemUpdate
 
 
-class ItemRuleError(Exception):
-    """A business rule was broken; main.py turns it into a 409 response."""
+def check_date(day: date) -> None:
+    # The server clock is in UTC, which is 6 hours behind Bangladesh.
+    # Allowing one extra day means "today" in Dhaka is never rejected by mistake.
+    latest_allowed = date.today() + timedelta(days=1)
+    if day > latest_allowed:
+        raise HTTPException(status_code=400, detail="The date cannot be in the future")
 
 
-# Business rules only: no HTTP and no database calls, everything stored goes through the repository.
-class ItemService:
-    def __init__(self, repo: ItemRepository) -> None:
-        self.repo = repo
+def get_items(db: Session, kind: str | None, search: str | None) -> list[Item]:
+    return repository.find_items(db, kind, search)
 
-    def list_items(self, offset: int, limit: int) -> ItemPage:
-        return ItemPage(items=self.repo.list(offset, limit), total=self.repo.count(), offset=offset, limit=limit)
 
-    def get_item(self, item_id: uuid.UUID) -> Item | None:
-        return self.repo.get(item_id)
+def add_item(db: Session, data: ItemCreate) -> Item:
+    check_date(data.date_happened)
+    new_item = Item(**data.model_dump())
+    return repository.save_item(db, new_item)
 
-    def create_item(self, data: ItemCreate) -> Item:
-        self._check_event_date(data.event_date)
-        return self.repo.create(Item.model_validate(data))
 
-    def update_item(self, item: Item, data: ItemUpdate) -> Item:
-        changes = data.model_dump(exclude_unset=True)
-        if not changes:
-            return item
-        if "event_date" in changes:
-            self._check_event_date(changes["event_date"])
-        changes["updated_at"] = utc_now()
-        return self.repo.update(item, changes)
+def edit_item(db: Session, item: Item, data: ItemUpdate) -> Item:
+    check_date(data.date_happened)
 
-    def delete_item(self, item: Item) -> None:
-        self.repo.delete(item)
+    # Copy every field from the form onto the item
+    for field_name, value in data.model_dump().items():
+        setattr(item, field_name, value)
 
-    def _check_event_date(self, event_date: date) -> None:
-        # The server runs in UTC; one day of slack lets users ahead of UTC (Dhaka is UTC+6) pick their today.
-        if event_date > date.today() + timedelta(days=1):
-            raise ItemRuleError("The date lost or found cannot be in the future")
+    item.updated_at = now_utc()
+    return repository.save_item(db, item)
+
+
+def delete_item(db: Session, item: Item) -> None:
+    repository.remove_item(db, item)

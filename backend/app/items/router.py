@@ -1,44 +1,53 @@
-# HTTP layer for /api/v1/items: takes the request, calls the service, returns the response.
-from typing import Annotated
+"""
+The REST API for items. Every URL here starts with /api/items.
 
-from fastapi import APIRouter, Query
+    GET     /api/items          -> list items (optional ?kind=lost|found and ?search=word)
+    POST    /api/items          -> create an item
+    GET     /api/items/{id}     -> read one item
+    PUT     /api/items/{id}     -> update an item
+    DELETE  /api/items/{id}     -> delete an item
+"""
 
-from app.items.dependencies import ItemDep, ServiceDep
+from typing import Literal
+
+from fastapi import APIRouter, Depends
+from sqlmodel import Session
+
+from app.database import get_db
+from app.items import service
+from app.items.dependencies import get_item_or_404
 from app.items.models import Item
-from app.items.schemas import ItemCreate, ItemPage, ItemRead, ItemUpdate
+from app.items.schemas import ItemCreate, ItemResponse, ItemUpdate
 
-router = APIRouter(prefix="/api/v1/items", tags=["items"])
-
-
-# Create a lost or found item; it starts as not resolved.
-@router.post("", response_model=ItemRead, status_code=201)
-def create_item(data: ItemCreate, service: ServiceDep) -> Item:
-    return service.create_item(data)
+router = APIRouter(prefix="/api/items", tags=["Items"])
 
 
-# List items, newest first, with the total so clients know when they reached the end.
-@router.get("", response_model=ItemPage)
+@router.get("", response_model=list[ItemResponse])
 def list_items(
-    service: ServiceDep,
-    offset: Annotated[int, Query(ge=0)] = 0,
-    limit: Annotated[int, Query(ge=1, le=100)] = 20,
-) -> ItemPage:
-    return service.list_items(offset, limit)
+    kind: Literal["lost", "found"] | None = None,
+    search: str | None = None,
+    db: Session = Depends(get_db),
+):
+    return service.get_items(db, kind, search)
 
 
-# Read one item by id, or 404 if it does not exist.
-@router.get("/{item_id}", response_model=ItemRead)
-def get_item(item: ItemDep) -> Item:
+@router.post("", response_model=ItemResponse, status_code=201)
+def create_item(data: ItemCreate, db: Session = Depends(get_db)):
+    return service.add_item(db, data)
+
+
+@router.get("/{item_id}", response_model=ItemResponse)
+def read_item(item: Item = Depends(get_item_or_404)):
     return item
 
 
-# Update only the fields that were sent; the others stay unchanged.
-@router.patch("/{item_id}", response_model=ItemRead)
-def update_item(item: ItemDep, data: ItemUpdate, service: ServiceDep) -> Item:
-    return service.update_item(item, data)
+@router.put("/{item_id}", response_model=ItemResponse)
+def update_item(data: ItemUpdate, item: Item = Depends(get_item_or_404), db: Session = Depends(get_db)):
+    return service.edit_item(db, item, data)
 
 
-# Delete an item; 204 means success with no response body.
-@router.delete("/{item_id}", status_code=204)
-def delete_item(item: ItemDep, service: ServiceDep) -> None:
-    service.delete_item(item)
+@router.delete("/{item_id}")
+def delete_item(item: Item = Depends(get_item_or_404), db: Session = Depends(get_db)):
+    item_id = item.id
+    service.delete_item(db, item)
+    return {"message": f"Item {item_id} deleted"}

@@ -1,29 +1,20 @@
-# Per-request wiring: builds session -> repository -> service, and loads the item for {item_id} routes.
-import uuid
-from typing import Annotated
+"""
+Shared helpers for the routes.
+
+get_item_or_404 is used by every route that has {item_id} in its URL.
+FastAPI runs it first: it loads the item, or stops the request with 404 if it does not exist.
+"""
 
 from fastapi import Depends, HTTPException
+from sqlmodel import Session
 
-from app.database import SessionDep
+from app.database import get_db
+from app.items import repository
 from app.items.models import Item
-from app.items.repository import ItemRepository
-from app.items.service import ItemService
 
 
-# Builds the service for this request: session -> repository -> service.
-def get_item_service(session: SessionDep) -> ItemService:
-    return ItemService(ItemRepository(session))
-
-
-ServiceDep = Annotated[ItemService, Depends(get_item_service)]
-
-
-# Resolves {item_id} from the path into an Item, or answers 404; routes just declare ItemDep.
-def valid_item(item_id: uuid.UUID, service: ServiceDep) -> Item:
-    item = service.get_item(item_id)
+def get_item_or_404(item_id: int, db: Session = Depends(get_db)) -> Item:
+    item = repository.find_item_by_id(db, item_id)
     if item is None:
-        raise HTTPException(status_code=404, detail="Item not found")
+        raise HTTPException(status_code=404, detail=f"No item with id {item_id}")
     return item
-
-
-ItemDep = Annotated[Item, Depends(valid_item)]

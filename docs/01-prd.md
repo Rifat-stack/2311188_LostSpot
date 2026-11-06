@@ -4,8 +4,8 @@
 |---|---|
 | **Product** | LostSpot |
 | **Document** | Product Requirements Document (PRD) |
-| **Version** | 1.1 |
-| **Date** | 4 November 2026 |
+| **Version** | 1.2 |
+| **Date** | 6 November 2026 |
 | **Author** | Rifat |
 | **Related docs** | [SRS](02-srs.md) · [TDD](03-tdd.md) |
 
@@ -29,7 +29,7 @@ The product is built in two releases. Every feature, story and milestone in this
 
 | Release | When | Tag | Focus |
 |---|---|---|---|
-| **MVP** | Demo before mid-term | `v0.1.0` | Lost and found item CRUD: post an item with its location and date, list, view, edit, mark resolved, delete. No accounts. |
+| **MVP** | Demo before mid-term | `v0.1.0` | Lost and found item CRUD: post an item with its location and date, list, search, view, edit, mark returned, delete. No accounts. |
 | **Beta** | Demo before final | `v0.2.0` | Accounts with university email, building floor maps with pins and areas, claim flow with a verification question, match suggestions, photos, admin dashboard and moderation, security hardening. |
 
 ```mermaid
@@ -53,7 +53,7 @@ On most campuses, lost and found happens in social media groups, chat groups, or
 |---|---|---|
 | G-01 | Let anyone post a lost or found item in under a minute, with where and when it happened. | MVP |
 | G-02 | Keep one list of every lost and found item on campus, newest first, that can be filtered. | MVP |
-| G-03 | Let posts be corrected, marked as resolved when the item is back with its owner, and deleted. | MVP |
+| G-03 | Let posts be corrected, marked as returned when the item is back with its owner, and deleted. | MVP |
 | G-08 | Place items on building floor maps, so people can check the exact area they were in. | Beta |
 | G-04 | Tie posts to verified university accounts to reduce spam and fake posts. | Beta |
 | G-05 | Reduce false claims with a hidden verification question on found items. | Beta |
@@ -75,7 +75,7 @@ On most campuses, lost and found happens in social media groups, chat groups, or
 
 | Release | In scope |
 |---|---|
-| **MVP** | Lost and found item posts with type, title, location (text), date, description and contact; create, list, view, edit, delete; mark resolved and reopen; filter by lost or found and hide resolved; clear all resolved items; no accounts; deployment on Vercel with Supabase PostgreSQL. |
+| **MVP** | Lost and found item posts with type, title, location (text), date, description and contact; create, list, view, edit, delete; mark returned or not returned; filter by lost or found; search by name, place or description; hide returned items; no accounts; deployment on Vercel with Supabase PostgreSQL. |
 | **Beta** | Sign up and login with a university email (JWT and refresh token); profile (change name and password); "my posts"; `user` and `admin` roles; buildings and floors with floor maps (pins for found items, areas for lost items); categories and search; photo upload; verification question and claim flow on found items; match suggestions; admin dashboard with stats; remove posts; ban and unban users; add buildings and floor plans; rate limiting, login lockout and other security hardening. |
 
 ### 6.2 Out of scope (this semester)
@@ -94,12 +94,12 @@ Priority uses MoSCoW: **M**ust, **S**hould, **C**ould, **W**on't (this semester)
 | ID | Feature | Priority | Release |
 |---|---|---|---|
 | F-01 | Post a lost or found item with title, location, date, description and contact | Must | MVP |
-| F-02 | List of all items, newest first, with "Load more" | Must | MVP |
+| F-02 | List of all items, newest first | Must | MVP |
 | F-03 | Item details page | Must | MVP |
 | F-04 | Edit an item | Must | MVP |
-| F-05 | Mark an item resolved or open again | Must | MVP |
-| F-06 | Delete an item, and clear all resolved items at once | Must | MVP |
-| F-07 | Filter the list by lost or found, and hide resolved items | Should | MVP |
+| F-05 | Mark an item returned or not returned | Must | MVP |
+| F-06 | Delete an item, after a confirmation | Must | MVP |
+| F-07 | Filter by lost or found, search by name, place or description, and hide returned items | Should | MVP |
 | F-08 | Building floor maps with pins (found) and areas (lost), categories and search | Must | Beta |
 | F-09 | Sign up / login with university email, JWT + refresh token | Must | Beta |
 | F-10 | Profile: change name and password, see my posts | Must | Beta |
@@ -125,10 +125,10 @@ Priority uses MoSCoW: **M**ust, **S**hould, **C**ould, **W**on't (this semester)
 | US-03 | As a visitor, I want to see all lost and found items, newest first, and show only lost or only found, so that I can quickly check whether my item is there. |
 | US-04 | As a visitor, I want to open an item and see all its details, so that I can decide if it is mine or one I found. |
 | US-05 | As a poster, I want to edit my item, so that I can fix mistakes or add details. |
-| US-06 | As a poster, I want to mark my item as resolved, or open it again, so that people know whether it is still missing. |
+| US-06 | As a poster, I want to mark my item as returned to its owner, or undo that, so that people know whether it is still missing. |
 | US-07 | As a poster, I want to delete my item, so that wrong or old posts disappear. |
-| US-08 | As a visitor, I want to hide resolved items or clear them all at once, so that the list only shows items still in play. |
-| US-09 | As a visitor, I want to load more items when the list is long, so that the page stays fast. |
+| US-08 | As a visitor, I want to hide items that are already returned, so that the list only shows items still in play. |
+| US-09 | As a visitor, I want to search by item name, place or description, so that I can find my item quickly. |
 
 ### 8.2 Beta
 
@@ -168,8 +168,8 @@ Priority uses MoSCoW: **M**ust, **S**hould, **C**ould, **W**on't (this semester)
 |---|---|---|---|
 | M1 | Docs | MVP | PRD, SRS, TDD and README merged into `main` |
 | M2 | Data layer | MVP | `item` model, database connection (SQLite locally, Supabase in production) |
-| M3 | Item REST API | MVP | Item CRUD endpoints under `/api/v1/items`, API docs at `/api/docs` |
-| M4 | Item UI and mid demo | MVP | React pages for list, details, create, edit and delete, deployed on Vercel, tagged `v0.1.0` |
+| M3 | Item REST API | MVP | Item CRUD endpoints under `/api/items`, API docs at `/api/docs` |
+| M4 | Item UI and mid demo | MVP | React + Bootstrap pages for list, details, create, edit and delete, deployed on Vercel, tagged `v0.1.0` |
 | B1 | Auth and profile | Beta | Register, login, refresh, logout, profile, my posts |
 | B2 | Floor maps, claims and photos | Beta | Buildings, floors and floor maps; verification question, claim flow, photo upload |
 | B3 | Match suggestions | Beta | Matches endpoint and "possible matches" panel |
