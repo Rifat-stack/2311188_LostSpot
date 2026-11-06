@@ -4,8 +4,8 @@
 |---|---|
 | **Product** | LostSpot |
 | **Document** | Technical Design Document (TDD) |
-| **Version** | 1.1 |
-| **Date** | 4 November 2026 |
+| **Version** | 1.2 |
+| **Date** | 6 November 2026 |
 | **Author** | Rifat |
 | **Related docs** | [PRD](01-prd.md) · [SRS](02-srs.md) |
 
@@ -23,8 +23,8 @@ This document explains how LostSpot is built: the stack, the architecture, the d
 | ORM | SQLModel | MVP | One class for both the table and the schema |
 | Database | Supabase PostgreSQL (production), SQLite (local) | MVP | Free hosted Postgres; SQLite needs no setup locally |
 | Frontend | React + TypeScript + Vite | MVP | Fast dev server, typed API calls |
-| UI library | Ant Design (`antd`), `@ant-design/icons`, `dayjs` | MVP | Ready-made form, list, date picker, confirm and message components |
-| Routing | React Router | MVP | One page per URL (`/`, `/items/:itemId`, `/about`) |
+| UI library | Bootstrap 5 with React-Bootstrap, plus my own CSS (sidebar layout, Poppins font, teal theme) | MVP | Ready-made forms, slide-in panel (Offcanvas), confirm dialog and alerts; widely taught |
+| Routing | React Router | MVP | One page per URL (`/` and `/items/:id`) |
 | Floor map | Leaflet (`react-leaflet`) with `CRS.Simple` and an image overlay | Beta | Treats a floor plan image as a flat map with zoom, pins and circles |
 | Hosting | Vercel (static frontend + Python serverless function for `/api/*`) | MVP | Free, deploys from GitHub |
 | Migrations | Alembic | Beta | Safe schema changes once real data exists |
@@ -36,8 +36,8 @@ This document explains how LostSpot is built: the stack, the architecture, the d
 
 ```mermaid
 flowchart LR
-    B["Browser: React + Ant Design"] -->|"static files"| V["Vercel CDN"]
-    B -->|"/api/v1/*"| F["FastAPI on Vercel serverless"]
+    B["Browser: React + Bootstrap"] -->|"static files"| V["Vercel CDN"]
+    B -->|"/api/*"| F["FastAPI on Vercel serverless"]
     F -->|"SQLModel"| DB[("Supabase PostgreSQL")]
     F -->|"Beta: photos, floor plans"| S[("Supabase Storage")]
     B -->|"floor plan and photo URLs"| S
@@ -47,13 +47,13 @@ Vercel serves the React build as static files. Every request to `/api/*` is rout
 
 ### 3.1 Request flow
 
-1. A page calls a function in `frontend/src/services/api.ts`, for example `apiService.getItems()`, which sends `GET /api/v1/items?offset=0&limit=20`.
-2. Vercel routes it to the `backend` service (`backend/main.py`), as set in `vercel.json`. Locally, Vite forwards `/api` to `localhost:8000`.
-3. The router (`app/items/router.py`) validates the path, query and body with the Pydantic schemas (`422` on failure).
-4. Dependencies run (`app/items/dependencies.py`): a database session, then `ItemRepository` and `ItemService` are built, and for `/{item_id}` routes `valid_item` loads the item or answers `404`.
-5. The router calls the service, which checks the business rules (for example no date in the future, `409`) and calls the repository.
-6. The repository reads or writes the `item` table through SQLModel.
-7. The response is serialised through `ItemRead` and goes back to the page, which updates its state and re-renders.
+1. A page calls a function in `frontend/src/api/items.ts`, for example `getItems("all", "")`, which sends `GET /api/items`.
+2. Vercel sends every `/api/*` request to the `backend` service (`backend/main.py`), as set in `vercel.json`. Locally, Vite forwards `/api` to `localhost:8000`.
+3. FastAPI checks the request against the schemas in `app/items/schemas.py` and answers `422` if something is wrong.
+4. For routes with an id in the URL, `get_item_or_404` (in `app/items/dependencies.py`) loads the item first, or answers `404`.
+5. The route in `app/items/router.py` calls a function in `app/items/service.py`, which checks the rules (the date can't be in the future, `400`).
+6. The service calls `app/items/repository.py`, the only file that runs database queries, on the `items` table.
+7. The item is sent back as JSON (`ItemResponse`). The page puts it into its state with `useState`, and React redraws the screen.
 
 ### 3.2 Create, update and delete an item (MVP)
 
@@ -61,31 +61,29 @@ Vercel serves the React build as static files. Every request to `/api/*` is rout
 sequenceDiagram
     actor U as User
     participant UI as React page
-    participant API as FastAPI router
-    participant S as ItemService
-    participant R as ItemRepository
+    participant API as router.py
+    participant S as service.py
+    participant R as repository.py
     participant DB as Database
-    U->>UI: Fill the form, click "Post item"
-    UI->>API: POST /api/v1/items
-    API->>API: Validate with ItemCreate (422 on error)
-    API->>S: create_item(data)
-    S->>S: Check event_date is not in the future (409)
-    S->>R: create(item)
-    R->>DB: INSERT item
-    API-->>UI: 201 ItemRead
-    UI->>API: GET /api/v1/items?offset=0&limit=20
-    API-->>UI: 200 {items, total}
-    U->>UI: Tick "resolved"
-    UI->>API: PATCH /api/v1/items/{id} {"is_resolved": true}
-    API->>S: update_item(item, changes)
-    S->>R: update(item, patch + updated_at)
-    R->>DB: UPDATE item
-    API-->>UI: 200 ItemRead
-    U->>UI: Delete, confirm
-    UI->>API: DELETE /api/v1/items/{id}
-    API->>R: delete(item)
-    R->>DB: DELETE item
-    API-->>UI: 204
+    U->>UI: Click "I lost something", fill the form, Post it
+    UI->>API: POST /api/items
+    API->>API: Check the body with ItemCreate (422 if wrong)
+    API->>S: add_item(db, data)
+    S->>S: check_date (400 if in the future)
+    S->>R: save_item(db, item)
+    R->>DB: INSERT INTO items
+    API-->>UI: 201 + the new item
+    U->>UI: Open the item, click "Mark as returned"
+    UI->>API: PUT /api/items/5 (whole item, is_returned = true)
+    API->>S: edit_item(db, item, data)
+    S->>R: save_item(db, item)
+    R->>DB: UPDATE items
+    API-->>UI: 200 + the updated item
+    U->>UI: Delete, then "Yes, delete"
+    UI->>API: DELETE /api/items/5
+    API->>R: remove_item(db, item)
+    R->>DB: DELETE FROM items
+    API-->>UI: 200 {"message": "Item 5 deleted"}
 ```
 
 ### 3.3 Login and refresh (Beta)
@@ -97,13 +95,13 @@ sequenceDiagram
     participant API as FastAPI
     participant DB as PostgreSQL
     U->>UI: Email + password
-    UI->>API: POST /api/v1/auth/login
+    UI->>API: POST /api/auth/login
     API->>DB: Find user, check ban and lockout
     API->>API: Verify Argon2 hash
     API->>DB: Save refresh token hash
     API-->>UI: access_token (15 min) + refresh_token (7 days)
     Note over UI,API: Later, access token expires
-    UI->>API: POST /api/v1/auth/refresh
+    UI->>API: POST /api/auth/refresh
     API->>DB: Check hash, not revoked, not expired, user not banned
     API->>DB: Revoke old, save new refresh token hash
     API-->>UI: New token pair
@@ -117,69 +115,64 @@ sequenceDiagram
     actor F as Finder
     participant API as FastAPI
     participant DB as PostgreSQL
-    C->>API: POST /api/v1/items/{id}/claims (answer, message)
+    C->>API: POST /api/items/{id}/claims (answer, message)
     API->>DB: Check item is found and open, claimant is not finder, no earlier claim
     API->>DB: INSERT claim (pending)
-    F->>API: GET /api/v1/items/{id}/claims
+    F->>API: GET /api/items/{id}/claims
     API-->>F: Claims with answers + expected secret answer
-    F->>API: POST /api/v1/claims/{claim_id}/approve
+    F->>API: POST /api/claims/{claim_id}/approve
     API->>DB: Claim approved, other pending claims rejected, item claimed
-    C->>API: GET /api/v1/items/{id}
+    C->>API: GET /api/items/{id}
     API-->>C: Item with finder contact and handoff note
 ```
 
 ## 4. Project structure
 
-The backend is organised by feature: `app/items/` holds everything for items, split into layers (router → service → repository → model).
-
 ```
 lostspot/
 ├── backend/
-│   ├── main.py                 # App entry: mounts the items router, maps errors to JSON, serves frontend/dist
+│   ├── main.py                 # Creates the FastAPI app, adds the item routes, creates the tables
 │   ├── requirements.txt
 │   └── app/
-│       ├── config.py           # Settings from env vars; Supabase URL in production, SQLite file locally
-│       ├── database.py         # Engine, create_db_and_tables, per-request Session (SessionDep)
+│       ├── config.py           # Picks the database: DATABASE_URL (Supabase) or a local SQLite file
+│       ├── database.py         # The engine, create_tables() and get_db() (one session per request)
 │       └── items/
-│           ├── models.py       # Item table
-│           ├── schemas.py      # ItemCreate, ItemUpdate, ItemRead, ItemPage
-│           ├── repository.py   # ItemRepository: every database query for items
-│           ├── service.py      # ItemService: business rules (date check, updated_at)
-│           ├── dependencies.py # Builds session -> repository -> service; valid_item loads {item_id} or 404
-│           └── router.py       # CRUD routes under /api/v1/items
+│           ├── models.py       # The `items` table
+│           ├── schemas.py      # ItemCreate, ItemUpdate, ItemResponse (what the API accepts and returns)
+│           ├── repository.py   # Database queries: find_items, find_item_by_id, save_item, remove_item
+│           ├── service.py      # Rules: check_date, add_item, edit_item, delete_item
+│           ├── dependencies.py # get_item_or_404: loads the item for routes with {item_id}
+│           └── router.py       # The five routes under /api/items
 ├── frontend/
 │   └── src/
-│       ├── main.tsx            # Mounts the app inside ThemeProvider
-│       ├── App.tsx             # Routes and the Ant Design theme
-│       ├── context/            # ThemeContext (dark mode)
-│       ├── layouts/            # AppLayout: header, menu, dark-mode switch
-│       ├── pages/              # HomePage, ItemDetailsPage, AboutPage
-│       ├── components/         # ItemForm, ItemList, ItemStats
-│       ├── services/api.ts     # The only place that calls the backend
-│       ├── types/item.ts       # TypeScript shapes that mirror the backend schemas
-│       └── utils/itemForm.ts   # Form <-> API conversion and validation rules
+│       ├── main.tsx            # Starts React, loads Bootstrap's CSS, turns on the router
+│       ├── App.tsx             # Picks the page for the URL
+│       ├── api/items.ts        # One function per API call (getItems, getItem, createItem, updateItem, deleteItem)
+│       ├── types.ts            # Item and ItemFormData types
+│       ├── utils.ts            # Dates and form helpers
+│       ├── components/         # Sidebar, ItemRow, ItemFormDrawer (slide-in form)
+│       └── pages/              # HomePage (list, filters, search), ItemPage (details, edit, returned, delete)
 ├── docs/                       # PRD, SRS, TDD
-├── AGENTS.md                   # Branch, commit and PR conventions
 └── vercel.json                 # /api/* -> backend, everything else -> frontend
 ```
 
 ## 5. Data model
 
-### 5.0 MVP: the `item` table (built in `v0.1.0`)
+### 5.0 MVP: the `items` table (built in `v0.1.0`)
 
-The MVP has one table. There are no relationships yet.
+The MVP has one table and no relationships yet.
 
 ```mermaid
 erDiagram
-    ITEM {
-        uuid id PK
-        string type
-        string title
+    ITEMS {
+        int id PK
+        string kind
+        string item_name
         string description
         string location
-        date event_date
+        date date_happened
         string contact
-        bool is_resolved
+        bool is_returned
         datetime created_at
         datetime updated_at
     }
@@ -187,15 +180,15 @@ erDiagram
 
 | Column | Type | Rules |
 |---|---|---|
-| `id` | UUID, primary key | Generated in Python with `uuid4`, so ids can't be guessed |
-| `type` | text (10) | `lost` or `found` |
-| `title` | text (200) | Required, trimmed |
-| `description` | text (1000), nullable | Optional |
-| `location` | text (200) | Required, trimmed, e.g. "CSE Building, Floor 2, near Lab 1" |
-| `event_date` | date | The day it was lost or found; not in the future |
-| `contact` | text (100), nullable | Optional, shown publicly |
-| `is_resolved` | boolean | `false` on create |
-| `created_at`, `updated_at` | timestamp with time zone (UTC) | Set by the app; `updated_at` changes on every update |
+| `id` | integer, primary key | The database numbers rows automatically: 1, 2, 3... |
+| `kind` | text (5) | `lost` or `found` |
+| `item_name` | text (100) | Required, spaces trimmed |
+| `description` | text (500), can be empty | Optional |
+| `location` | text (150) | Required, e.g. "CSE Building, Floor 2, near Lab 1" |
+| `date_happened` | date | The day it was lost or found; not in the future |
+| `contact` | text (100), can be empty | Optional, shown publicly |
+| `is_returned` | true / false | `false` when created |
+| `created_at`, `updated_at` | date and time (UTC) | Set by the backend; `updated_at` changes on every update |
 
 ### 5.1 Beta ERD
 
@@ -285,7 +278,7 @@ erDiagram
 
 - `building`: campus buildings. `code` is short and unique (for example `CSE`).
 - `floor`: one row per floor. `plan_width` and `plan_height` are the image size in pixels, used to convert relative coordinates.
-- `item`: lost and found posts. `radius` and `time_to` are set only for lost items; `handoff_note` only for found items. `found_note` and `found_reported_at` are filled by a found report. Indexes on `(floor_id, status)`, `(category, status)` and `created_at`. `is_resolved` becomes the `status` column.
+- `item`: lost and found posts. `radius` and `time_to` are set only for lost items; `handoff_note` only for found items. `found_note` and `found_reported_at` are filled by a found report. Indexes on `(floor_id, status)`, `(category, status)` and `created_at`. `is_returned` becomes the `status` column.
 
 **Beta (accounts and claims)**
 
@@ -324,60 +317,53 @@ Steps 1 and 2 run as a SQL filter. Step 3 runs in Python on the (small) filtered
 
 ## 8. REST API
 
-All endpoints are under `/api/v1`. OpenAPI docs are at `/api/docs` (not `/docs`, because `vercel.json` sends only `/api/*` to the backend). Errors use FastAPI's default shape `{"detail": "..."}`.
+All endpoints are under `/api`. OpenAPI docs are at `/api/docs` (not `/docs`, because `vercel.json` sends only `/api/*` to the backend). Errors use FastAPI's default shape `{"detail": "..."}`.
 
 ### 8.1 MVP endpoints
 
-In the MVP there are no accounts, so anyone can call every endpoint.
+There are no accounts in the MVP, so anyone can call these.
 
-| Method | Path | Operation | Success | Errors |
+| Method | Path | What it does | Success | Errors |
 |---|---|---|---|---|
-| `POST` | `/items` | **Create** an item | `201` + item | `422` invalid input, `409` date in the future |
-| `GET` | `/items?offset=0&limit=20` | **Read list**, newest first. `offset` ≥ 0, `limit` 1 to 100 (default 20) | `200` + `{items, total, offset, limit}` | `422` |
-| `GET` | `/items/{item_id}` | **Read single** | `200` + item | `404` "Item not found", `422` bad UUID |
-| `PATCH` | `/items/{item_id}` | **Update** only the fields sent (including `is_resolved`) | `200` + item | `404`, `422`, `409` |
-| `DELETE` | `/items/{item_id}` | **Delete** | `204` | `404` |
-| `GET` | `/api/health` | Health check | `200` | |
+| `GET` | `/api/items` | **Read list**, newest first. Optional `?kind=lost` or `found`, and `?search=word` | `200` + list of items | `422` bad `kind` |
+| `POST` | `/api/items` | **Create** an item | `201` + the item | `422` invalid input, `400` date in the future |
+| `GET` | `/api/items/{id}` | **Read one** item | `200` + the item | `404` "No item with id N" |
+| `PUT` | `/api/items/{id}` | **Update**: send the whole item, including `is_returned` | `200` + the item | `404`, `422`, `400` |
+| `DELETE` | `/api/items/{id}` | **Delete** an item | `200` + `{"message": "Item N deleted"}` | `404` |
+| `GET` | `/api/health` | Check the backend is running | `200` | |
 
-Example create request:
+Create example:
 
 ```json
-POST /api/v1/items
+POST /api/items
 {
-  "type": "lost",
-  "title": "Black car key",
+  "kind": "lost",
+  "item_name": "Black car key",
+  "location": "CSE Building, Floor 2, near Lab 1",
+  "date_happened": "2026-11-06",
   "description": "Toyota key with a red keychain",
-  "location": "CSE Building, Floor 2, corridor near Lab 1",
-  "event_date": "2026-11-04",
   "contact": "2311188@iub.edu.bd"
 }
 ```
 
-Response `201`:
+Answer `201`:
 
 ```json
 {
-  "type": "lost",
-  "title": "Black car key",
+  "id": 5,
+  "kind": "lost",
+  "item_name": "Black car key",
   "description": "Toyota key with a red keychain",
-  "location": "CSE Building, Floor 2, corridor near Lab 1",
-  "event_date": "2026-11-04",
+  "location": "CSE Building, Floor 2, near Lab 1",
+  "date_happened": "2026-11-06",
   "contact": "2311188@iub.edu.bd",
-  "id": "48936517-5b1c-4c1e-9d55-0d3b1f6f2a10",
-  "is_resolved": false,
-  "created_at": "2026-11-04T11:15:21.000202Z",
-  "updated_at": "2026-11-04T11:15:21.000202Z"
+  "is_returned": false,
+  "created_at": "2026-11-06T07:17:59.561502Z",
+  "updated_at": "2026-11-06T07:17:59.561502Z"
 }
 ```
 
-Mark it resolved:
-
-```json
-PATCH /api/v1/items/48936517-5b1c-4c1e-9d55-0d3b1f6f2a10
-{ "is_resolved": true }
-```
-
-Error examples: `{"detail": "Item not found"}` (404), `{"detail": "The date lost or found cannot be in the future"}` (409), `{"detail": [{"loc": ["body", "title"], "msg": "String should have at least 1 character", ...}]}` (422).
+Update uses `PUT`, so the frontend sends every field (it already has them all in the edit form). To mark the item returned, it sends the same item with `"is_returned": true`.
 
 ### 8.2 Beta endpoints
 
@@ -418,10 +404,9 @@ From Beta on, item endpoints need a logged-in user. "Owner" means the user who c
 ### 9.1 MVP
 
 - No accounts yet: anyone can create, edit and delete items. This is accepted for the mid-term demo; Beta adds login and ownership checks.
-- Item ids are random UUIDs, so items can't be found by counting ids.
-- Every input is validated by the Pydantic schemas before the service runs (`422`).
-- A catch-all exception handler logs the real error and returns only `{"detail": "Internal server error"}` (`500`), so stack traces and database details never reach the client.
-- The database URL is read from environment variables and never committed.
+- Every request body is checked by the schemas before any of our code runs (`422`).
+- Update and delete first load the item with `get_item_or_404`, so a missing id always gives a clean `404`.
+- The database URL comes from an environment variable and is never committed.
 
 ### 9.2 Authentication (Beta)
 
@@ -455,7 +440,7 @@ The secret answer is stored as plain text because the finder has to compare it w
 
 ## 10. Admin dashboard stats (Beta)
 
-`GET /api/v1/admin/stats` returns:
+`GET /api/admin/stats` returns:
 
 ```json
 {
@@ -496,7 +481,7 @@ Secrets go in a local `.env` file (listed in `.gitignore`) and in Vercel's proje
 
 ## 13. Migrations
 
-- **MVP:** the `item` table is created with `SQLModel.metadata.create_all()` when the app starts (`main.py`). Existing tables and data are kept. This is fine while there is only one table.
+- **MVP:** the `items` table is created by `create_tables()` (which calls `SQLModel.metadata.create_all()`) when the app starts in `main.py`. Existing tables and data are kept. This is fine while there is only one table.
 - **Beta:** Alembic is added. The first migration matches the MVP schema; the second adds `app_user`, `refresh_token`, `claim` and the new `item` columns. Migrations are run by hand against Supabase before each deploy.
 
 ## 14. Deployment

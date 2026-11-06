@@ -1,39 +1,50 @@
-# Data access layer: every database query for items lives here, called only by the service.
-import uuid
+"""
+All database queries for items.
 
-from sqlmodel import Session, func, select
+Only this file talks to the database. The service calls these functions
+and never writes queries itself.
+"""
+
+from sqlmodel import Session, or_, select
 
 from app.items.models import Item
 
 
-# The only class that knows where items are stored; the service calls it and never sees SQL.
-class ItemRepository:
-    def __init__(self, session: Session) -> None:
-        self.session = session
+def find_items(db: Session, kind: str | None = None, search: str | None = None) -> list[Item]:
+    query = select(Item)
 
-    def list(self, offset: int, limit: int) -> list[Item]:
-        statement = select(Item).order_by(Item.created_at.desc(), Item.id.desc()).offset(offset).limit(limit)
-        return list(self.session.exec(statement).all())
+    # Only lost items or only found items
+    if kind:
+        query = query.where(Item.kind == kind)
 
-    def count(self) -> int:
-        return self.session.exec(select(func.count()).select_from(Item)).one()
+    # Look for the search word in the name, location or description (not case sensitive)
+    if search:
+        pattern = f"%{search}%"
+        query = query.where(
+            or_(
+                Item.item_name.ilike(pattern),
+                Item.location.ilike(pattern),
+                Item.description.ilike(pattern),
+            )
+        )
 
-    def get(self, item_id: uuid.UUID) -> Item | None:
-        return self.session.get(Item, item_id)
+    # Newest posts first
+    query = query.order_by(Item.created_at.desc())
+    return list(db.exec(query).all())
 
-    def create(self, item: Item) -> Item:
-        return self._save(item)
 
-    def update(self, item: Item, patch: dict) -> Item:
-        item.sqlmodel_update(patch)
-        return self._save(item)
+def find_item_by_id(db: Session, item_id: int) -> Item | None:
+    return db.get(Item, item_id)
 
-    def delete(self, item: Item) -> None:
-        self.session.delete(item)
-        self.session.commit()
 
-    def _save(self, item: Item) -> Item:
-        self.session.add(item)
-        self.session.commit()
-        self.session.refresh(item)
-        return item
+def save_item(db: Session, item: Item) -> Item:
+    """Insert a new item or save changes to an existing one."""
+    db.add(item)
+    db.commit()
+    db.refresh(item)  # reload it so we get the id and the saved values back
+    return item
+
+
+def remove_item(db: Session, item: Item) -> None:
+    db.delete(item)
+    db.commit()

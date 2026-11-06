@@ -1,15 +1,17 @@
-// Entry point: mounts the React app inside the theme provider.
+// Starting point of the React app.
+
+import "bootstrap/dist/css/bootstrap.min.css" // Bootstrap's styles
+import "./index.css"                          // our own small extra styles
+
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
+import { BrowserRouter } from "react-router"
 import App from "./App"
-import { ThemeProvider } from "./context/ThemeContext"
-import "./index.css"
 
-// StrictMode (dev only) runs renders and effects twice to catch bugs, so you may see API calls twice.
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ThemeProvider>
+    <BrowserRouter>
       <App />
-    </ThemeProvider>
+    </BrowserRouter>
   </StrictMode>,
 )

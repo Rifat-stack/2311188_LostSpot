@@ -1,115 +1,103 @@
-# LostSpot
+# 📍 LostSpot
 
-A lost and found app for campus that is built around **where** things go missing. Post what you lost or found and where it happened, so the owner and the finder can meet. Built as a REST API with FastAPI and a React frontend, deployed on Vercel.
+**Lost something on campus? Found something that isn't yours?** LostSpot is a small web app where students post lost and found items together with *where* it happened, so owners and finders can find each other.
 
-> **Status:** MVP (`v0.1.0`). The item CRUD API (`/api/v1/items`) and an Ant Design frontend work locally with SQLite and in production with Supabase PostgreSQL; accounts, floor maps and claims are planned for the Beta.
+Made by **Rifat Abdullah Khan (2311188)** for CSE309.
 
-## Features
+Live site: https://2311188project-name.vercel.app · API docs: https://2311188project-name.vercel.app/api/docs
 
-**MVP** (demo before mid-term)
-- Post a lost or found item with a title, location, date, description and contact
-- List items (newest first), view one, edit it, mark it resolved and delete it through a REST API (`/api/v1/items`)
-- Filter the list by lost or found, hide resolved items, clear all resolved items
-- Input validation with clear error responses
-- Interactive API docs at `/api/docs`
+---
 
-**Beta** (demo before final)
-- Sign up and log in with a university email (JWT access token + refresh token)
-- Profile page: change your name and password, see your own posts
-- Building floor maps: lost items as an area, found items as an exact pin
-- Claim flow with a hidden verification question, and match suggestions between lost and found items
-- Roles: `user` and `admin`; admin dashboard with stats, remove posts, ban / unban users
-- Security: Argon2 password hashing, login lockout, rate limits, security headers
+## What you can do (MVP)
 
-## Tech stack
+- **Report** a lost or found item: what it is, where, which day, a description and how to contact you
+- **Browse** every post as cards, newest first
+- **Filter** by Lost or Found, **search** by name, place or description, and hide items that were already returned
+- **Open** an item to see everything about it
+- **Edit** a post, **mark it returned** to its owner, or **delete** it
 
-| Part | Choice |
+Coming in the Beta: accounts, building floor maps with pins, claiming a found item with a secret question, and an admin page.
+
+## Built with
+
+| Part | Tools |
 |---|---|
-| Backend | Python 3.10+, FastAPI, SQLModel |
-| Database | Supabase PostgreSQL (production), SQLite (local) |
-| Frontend | React + TypeScript + Vite, Ant Design, React Router |
-| Hosting | Vercel (frontend and backend in one project) |
-| Beta extras | Alembic (migrations), PyJWT, Argon2, Supabase Storage |
+| Frontend | React, TypeScript, Vite, React-Bootstrap (Bootstrap 5), React Router |
+| Backend | Python, FastAPI, SQLModel |
+| Database | PostgreSQL on Supabase (online), SQLite file (on my computer) |
+| Hosting | Vercel |
 
-## Documentation
-
-| Doc | What it covers |
-|---|---|
-| [PRD — Product Requirements Document](docs/01-prd.md) | Goals, features, user stories, milestones |
-| [SRS — Software Requirements Specification](docs/02-srs.md) | Functional and non-functional requirements, permissions, acceptance criteria |
-| [TDD — Technical Design Document](docs/03-tdd.md) | Architecture, data model, API endpoints, auth and security design |
-
-## Project structure
+## How a request travels
 
 ```
-backend/    FastAPI app (routes under /api)
-frontend/   Vite + React + TypeScript
-docs/       PRD, SRS, TDD (product requirements, software requirements, technical design)
-vercel.json Vercel setup: /api/* goes to backend, everything else to frontend
-AGENTS.md   Branch, commit and PR conventions
+ Browser (React)                    Backend (FastAPI)                        Database
+ ───────────────                    ─────────────────                        ────────
+ HomePage / ItemPage
+      │  calls a function in
+      ▼
+ src/api/items.ts  ── HTTP ──▶  router.py ──▶ service.py ──▶ repository.py ──▶ items table
+                     ◀── JSON ──  (routes)      (rules)        (queries)
 ```
 
-## How it works
+- **router.py** receives the request and sends the answer back.
+- **service.py** checks the rules, for example "the date can't be in the future".
+- **repository.py** is the only file that reads or writes the database.
 
-### Frontend
+## The API
 
-```mermaid
-flowchart LR
-    page["Page<br/>HomePage, ItemDetailsPage"] --> comp["Components<br/>ItemForm, ItemList"]
-    page --> api["services/api.ts<br/>calls the backend"]
-    api -->|"HTTP"| backend[("Backend API")]
-```
-
-A page shows the screen and keeps its data, components draw the pieces, and `services/api.ts` is the only place that talks to the backend.
-
-### Backend
-
-```mermaid
-flowchart LR
-    req(["HTTP request"]) --> router["Router<br/>receives the request"]
-    router --> service["Service<br/>business rules"]
-    service --> repo["Repository<br/>database queries"]
-    repo --> db[("Database")]
-```
-
-Each layer has one job: the router handles HTTP, the service decides what is allowed (for example, no date in the future), and the repository reads and writes the database. The response goes back up the same way.
-
-### REST API
-
-| Method | Path | What it does |
+| Method | URL | What it does |
 |---|---|---|
-| `POST` | `/api/v1/items` | Create an item (201) |
-| `GET` | `/api/v1/items?offset=0&limit=20` | List items, newest first, with `total` |
-| `GET` | `/api/v1/items/{id}` | Read one item (404 if missing) |
-| `PATCH` | `/api/v1/items/{id}` | Update only the fields sent, including `is_resolved` |
-| `DELETE` | `/api/v1/items/{id}` | Delete an item (204) |
+| GET | `/api/items` | List all items (add `?kind=lost`, `?kind=found` or `?search=key` to filter) |
+| POST | `/api/items` | Create an item |
+| GET | `/api/items/5` | Get item number 5 |
+| PUT | `/api/items/5` | Update item number 5 |
+| DELETE | `/api/items/5` | Delete item number 5 |
 
-## Requirements
+Example body for POST and PUT (PUT also needs `"is_returned": true` or `false`):
 
-- [Python](https://www.python.org/downloads/) 3.10+
-- [Node.js](https://nodejs.org/) 22+
+```json
+{
+  "kind": "lost",
+  "item_name": "Black car key",
+  "location": "CSE Building, Floor 2, near Lab 1",
+  "date_happened": "2026-11-06",
+  "description": "Toyota key with a red keychain",
+  "contact": "2311188@iub.edu.bd"
+}
+```
 
-> On macOS/Linux, use `python3` instead of `python`.
+You can try every endpoint in the browser at `/api/docs`.
 
-## Run locally
+## Folder guide
 
-You need two terminals: one for the backend and one for the frontend. Items are saved in a local SQLite file, `backend/lostspot.db`, which is created automatically on the first run and is not committed.
+```
+backend/
+  main.py              starts the app and creates the tables
+  app/config.py        decides which database to use
+  app/database.py      database connection
+  app/items/           everything for items: models, schemas, repository, service, dependencies, router
+frontend/
+  src/api/items.ts     every call to the backend
+  src/pages/           HomePage (the list) and ItemPage (one item)
+  src/components/      Sidebar, ItemRow, ItemFormDrawer (the slide-in form)
+docs/                  PRD, SRS and TDD
+```
 
-### First time (initial setup)
+## Run it on your computer
 
-Run this once after cloning the repo.
+You need **Python 3.10+** and **Node.js 22+**. Open two terminals.
 
-**Backend** (terminal 1):
+**Terminal 1 – backend**
 
 ```bash
 cd backend
 python -m venv .venv
-.venv\Scripts\Activate.ps1      # macOS/Linux: source .venv/bin/activate
+.venv\Scripts\activate          # Mac/Linux: source .venv/bin/activate
 pip install -r requirements.txt
 fastapi dev main.py
 ```
 
-**Frontend** (terminal 2):
+**Terminal 2 – frontend**
 
 ```bash
 cd frontend
@@ -117,69 +105,27 @@ npm install
 npm run dev
 ```
 
-### Running again (after the initial setup)
+Now open http://localhost:5173. The API docs are at http://localhost:8000/api/docs.
 
-The virtual environment and `node_modules` already exist, so skip the install steps.
+The next time, you can skip `python -m venv`, `pip install` and `npm install`.
 
-**Backend** (terminal 1):
+On your computer the data is saved in `backend/lostspot.db`. Delete that file if you want to start with an empty list.
 
-```bash
-cd backend
-.venv\Scripts\Activate.ps1      # macOS/Linux: source .venv/bin/activate
-fastapi dev main.py
-```
+## Put it online
 
-**Frontend** (terminal 2):
+1. Create a free project on [Supabase](https://supabase.com). Click **Connect → Transaction pooler** and copy the connection string (it ends with `:6543/postgres`). Put your database password into it.
+2. Import this repository on [Vercel](https://vercel.com).
+3. In Vercel, open **Settings → Environment Variables** and add `DATABASE_URL` with the Supabase connection string.
+4. Deploy. The `items` table is created automatically on the first request.
 
-```bash
-cd frontend
-npm run dev
-```
+Never put the database password in the code or in GitHub.
 
-Run `pip install -r requirements.txt` or `npm install` again only when someone adds or changes a dependency.
+## How I work on this repo
 
-Open http://localhost:5173. Vite forwards `/api` requests to the backend on port 8000. API docs: http://localhost:8000/api/docs.
+Every change starts with a GitHub issue. I make a branch named `rifat/#<issue number>-<short-title>`, write commits like `feat: add search to the item list (#4)`, and open a pull request that says `Closes #<issue number>`. After it is merged into `main`, Vercel deploys it.
 
-> Add new Python packages to `backend/requirements.txt`.
+## Documents
 
-> **Reset the data:** stop the backend and delete `backend/lostspot.db`.
-
-## Environment variables
-
-Locally nothing needs to be set: the app uses the SQLite file `backend/lostspot.db`. In production (Vercel) the app uses Supabase PostgreSQL. Set variables in Vercel under **Project → Settings → Environment Variables** (a local `.env` is never committed).
-
-| Variable | Needed for | Notes |
-|---|---|---|
-| `DATABASE_URL` | MVP (production) | Supabase transaction pooler URL (port `6543`), e.g. `postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres`. Leave unset locally to use SQLite. Vercel cannot keep a SQLite file between requests, so without a hosted database the deployed app loses its data. |
-| `POSTGRES_URL` | MVP (production) | Set automatically by the Supabase integration on Vercel. Used when `DATABASE_URL` is not set; `postgres://` and the Supabase-only `supa=` parameter are handled for you. |
-| `JWT_SECRET` | Beta | Long random string, e.g. `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
-| `ACCESS_TOKEN_MINUTES` | Beta | Default `15` |
-| `REFRESH_TOKEN_DAYS` | Beta | Default `7` |
-
-Never commit secrets or `.env` files. See [TDD, section 12](docs/03-tdd.md#12-supabase-setup) for the Supabase setup.
-
-## Deploy to Vercel
-
-1. Push the repo to GitHub.
-2. Go to https://vercel.com/new, import the repo and click **Deploy**. Keep **Root Directory** as `./`.
-3. Add `DATABASE_URL` (see above) and redeploy.
-
-Every push to `main` redeploys automatically.
-
-## Contributing
-
-Every change starts from a GitHub issue. Branch, commit and pull request rules are in [AGENTS.md](AGENTS.md):
-
-- Branch: `rifat/#{issue_number}-{task_title}`
-- Commit: `<type>: <summary> (#issue)`, e.g. `feat: add item crud api with sqlmodel and validation (#4)`
-- One pull request per issue, with `Closes #{issue_number}` in the description
-
-## Troubleshooting
-
-- **"Running scripts is disabled" in PowerShell:** run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
-- **`fastapi` not found:** activate the virtual environment first.
-- **`ModuleNotFoundError: sqlmodel`:** run `pip install -r requirements.txt` inside the activated virtual environment.
-- **Items look wrong or the database is corrupted:** stop the backend and delete `backend/lostspot.db`; it is recreated on the next start.
-- **`Request failed: 500` in the app:** the backend isn't running, or `DATABASE_URL` is wrong.
-- **App at localhost:8000 shows an old version:** delete `frontend/dist`.
-- **Vercel build fails:** check **Build Logs** in the Vercel dashboard, and make sure `npm run build` works in `frontend/`.
+- [Product Requirements Document (PRD)](docs/01-prd.md)
+- [Software Requirements Specification (SRS)](docs/02-srs.md)
+- [Technical Design Document (TDD)](docs/03-tdd.md)

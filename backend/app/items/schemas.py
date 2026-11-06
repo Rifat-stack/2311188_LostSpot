@@ -1,65 +1,58 @@
-# Request and response shapes; FastAPI validates input against these before any item code runs.
-import uuid
-from datetime import date, datetime, timezone
-from typing import Annotated, Literal
+"""
+What the API accepts and what it sends back.
 
-from pydantic import StringConstraints, field_validator
-from sqlmodel import Field, SQLModel
+FastAPI checks every request against these classes. If something is wrong
+(for example an empty item name), it answers with 422 before our code even runs.
+"""
 
-ItemType = Literal["lost", "found"]
+from datetime import date, datetime
+from typing import Literal
 
-# Spaces are trimmed before the length check, so "   " is rejected.
-Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
-Location = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+from pydantic import BaseModel, Field, field_validator
 
 
-class ItemBase(SQLModel):
-    type: ItemType
-    title: Title
-    description: str | None = Field(default=None, max_length=1000)
-    location: Location
-    event_date: date
+class ItemCreate(BaseModel):
+    """Body for POST /api/items"""
+
+    kind: Literal["lost", "found"]
+    item_name: str = Field(min_length=1, max_length=100)
+    description: str | None = Field(default=None, max_length=500)
+    location: str = Field(min_length=1, max_length=150)
+    date_happened: date
     contact: str | None = Field(default=None, max_length=100)
 
-
-class ItemCreate(ItemBase):
-    pass
-
-
-class ItemUpdate(SQLModel):
-    type: ItemType | None = None
-    title: Title | None = None
-    description: str | None = Field(default=None, max_length=1000)
-    location: Location | None = None
-    event_date: date | None = None
-    contact: str | None = Field(default=None, max_length=100)
-    is_resolved: bool | None = None
-
-    # description and contact may be cleared with null; the other fields may not.
-    @field_validator("type", "title", "location", "event_date", "is_resolved")
+    @field_validator("item_name", "location")
     @classmethod
-    def not_null(cls, value: object) -> object:
-        if value is None:
-            raise ValueError("cannot be null")
+    def must_not_be_blank(cls, value: str) -> str:
+        value = value.strip()
+        if value == "":
+            raise ValueError("cannot be empty")
         return value
 
+    @field_validator("description", "contact")
+    @classmethod
+    def empty_text_becomes_none(cls, value: str | None) -> str | None:
+        if value is None or value.strip() == "":
+            return None
+        return value.strip()
 
-class ItemRead(ItemBase):
-    id: uuid.UUID
-    is_resolved: bool
+
+class ItemUpdate(ItemCreate):
+    """Body for PUT /api/items/{id}: the whole item, plus whether it has been returned."""
+
+    is_returned: bool
+
+
+class ItemResponse(BaseModel):
+    """What the API sends back for one item."""
+
+    id: int
+    kind: str
+    item_name: str
+    description: str | None
+    location: str
+    date_happened: date
+    contact: str | None
+    is_returned: bool
     created_at: datetime
     updated_at: datetime
-
-    # SQLite returns naive datetimes; they are stored as UTC.
-    @field_validator("created_at", "updated_at")
-    @classmethod
-    def as_utc(cls, value: datetime) -> datetime:
-        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
-
-
-# One page of the list; total counts all items, not just this page.
-class ItemPage(SQLModel):
-    items: list[ItemRead]
-    total: int
-    offset: int
-    limit: int

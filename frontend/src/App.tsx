@@ -1,30 +1,15 @@
-// Routes and the Ant Design theme; every page renders inside AppLayout.
-import { App as AntApp, ConfigProvider, theme } from "antd"
-import { BrowserRouter, Route, Routes } from "react-router"
-import { useTheme } from "./context/ThemeContext"
-import { AppLayout } from "./layouts/AppLayout"
-import { AboutPage } from "./pages/AboutPage"
-import { HomePage } from "./pages/HomePage"
-import { ItemDetailsPage } from "./pages/ItemDetailsPage"
+// The app: shows whichever page matches the URL.
 
-function App() {
-  const { darkMode } = useTheme()
+import { Route, Routes } from "react-router"
+import HomePage from "./pages/HomePage"
+import ItemPage from "./pages/ItemPage"
 
+export default function App() {
   return (
-    <ConfigProvider theme={{ algorithm: darkMode ? theme.darkAlgorithm : theme.defaultAlgorithm, token: { borderRadius: 6 } }}>
-      <AntApp>
-        <BrowserRouter>
-          <Routes>
-            <Route element={<AppLayout />}>
-              <Route index element={<HomePage />} />
-              <Route path="items/:itemId" element={<ItemDetailsPage />} />
-              <Route path="about" element={<AboutPage />} />
-            </Route>
-          </Routes>
-        </BrowserRouter>
-      </AntApp>
-    </ConfigProvider>
+    <Routes>
+      <Route path="/" element={<HomePage />} />
+      <Route path="/items/:id" element={<ItemPage />} />
+      <Route path="*" element={<p className="p-5">Page not found.</p>} />
+    </Routes>
   )
 }
-
-export default App
