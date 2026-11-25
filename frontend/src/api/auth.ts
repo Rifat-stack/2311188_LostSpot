@@ -33,22 +33,6 @@ export async function restoreSession(): Promise<User | null> {
   return answer ? answer.user : null
 }
 
-// GET /api/auth/demo-accounts: the test accounts shown on the login page (set on the server, not in the code)
-export interface DemoLogin {
-  label: string
-  email: string
-  password: string
-}
-
-export async function getDemoLogins(): Promise<DemoLogin[]> {
-  try {
-    const response = await fetch("/api/auth/demo-accounts")
-    return response.ok ? await response.json() : []
-  } catch {
-    return [] // no test accounts is fine
-  }
-}
-
 // POST /api/auth/logout: the server ends the session and deletes the cookie
 export async function logOut(): Promise<void> {
   try {

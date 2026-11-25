@@ -1,11 +1,19 @@
 // Log in page (/login)
 
-import { useEffect, useState, type FormEvent } from "react"
+import { useState, type FormEvent } from "react"
 import { Alert, Button, Form } from "react-bootstrap"
 import { Link, Navigate, useLocation, useNavigate } from "react-router"
-import { getDemoLogins, type DemoLogin } from "../api/auth"
 import { useAuth } from "../AuthContext"
 import Layout from "../components/Layout"
+
+// Test accounts for the instructor (demo data only). Copy one into the form to log in.
+// To change them, edit this list. The accounts must also exist (sign them up on the site).
+const TEST_ACCOUNTS = [
+  { role: "Admin", email: "admin1@lostspot-demo.com", password: "Admin12345" },
+  { role: "Admin", email: "admin2@lostspot-demo.com", password: "Admin67890" },
+  { role: "User", email: "owner@lostspot-demo.com", password: "User12345" },
+  { role: "User", email: "poster@lostspot-demo.com", password: "User67890" },
+]
 
 export default function LoginPage() {
   const { user, logIn, notice } = useAuth()
@@ -18,12 +26,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [sending, setSending] = useState(false)
-  const [demoLogins, setDemoLogins] = useState<DemoLogin[]>([])
-
-  // The test accounts for the instructor (only if they are set on the server)
-  useEffect(() => {
-    getDemoLogins().then(setDemoLogins)
-  }, [])
 
   if (user && !sending) {
     return <Navigate to={goBackTo} replace /> // already logged in
@@ -50,27 +52,17 @@ export default function LoginPage() {
           <h1>Welcome back</h1>
           <p>Log in to post items, join groups and manage your account.</p>
 
-          {demoLogins.length > 0 && (
-            <div className="demo-logins">
-              <p className="demo-title">Test accounts</p>
-              {demoLogins.map((demo) => (
-                <button
-                  key={demo.email}
-                  type="button"
-                  className="demo-login"
-                  onClick={() => {
-                    setEmail(demo.email) // fill the form; the user still clicks "Log in"
-                    setPassword(demo.password)
-                  }}
-                >
-                  <strong>{demo.label}</strong>
-                  <span>{demo.email}</span>
-                  <span>{demo.password}</span>
-                </button>
-              ))}
-              <p className="demo-hint">Click one to fill in the form.</p>
-            </div>
-          )}
+          <div className="demo-logins">
+            <p className="demo-title">Test accounts</p>
+            {TEST_ACCOUNTS.map((account) => (
+              <div key={account.email} className="demo-login">
+                <strong>{account.role}</strong>
+                <span>{account.email}</span>
+                <span>{account.password}</span>
+              </div>
+            ))}
+            <p className="demo-hint">Copy an email and password into the form.</p>
+          </div>
         </div>
 
         <Form className="auth-form" onSubmit={handleSubmit}>

@@ -551,10 +551,7 @@ body {
   font-size: 0.8rem;
   text-align: left;
   word-break: break-all;
-}
-
-.demo-login:hover {
-  background: rgba(255, 255, 255, 0.2);
+  user-select: text;
 }
 
 .demo-login strong {

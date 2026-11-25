@@ -82,20 +82,3 @@ FRONTEND_ORIGINS = [
     if origin.strip()
 ]
 
-
-def get_demo_logins() -> list[dict]:
-    """Test accounts shown on the login page, so the instructor can log in with one click.
-
-    They come from the DEMO_LOGINS environment variable on Vercel, never from the code,
-    so no password is ever in the repository. Format, one account per part:
-        label|email|password;label|email|password
-    For example:  Admin|admin1@lostspot.test|Secret123;User|poster@lostspot.test|Secret456
-    If DEMO_LOGINS is not set, the login page shows no test accounts.
-    """
-    accounts = []
-    for part in os.getenv("DEMO_LOGINS", "").split(";"):
-        pieces = [piece.strip() for piece in part.split("|")]
-        if len(pieces) == 3 and all(pieces):
-            label, email, password = pieces
-            accounts.append({"label": label, "email": email, "password": password})
-    return accounts

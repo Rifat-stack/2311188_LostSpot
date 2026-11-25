@@ -5,7 +5,6 @@ The account routes.
     POST   /api/auth/login               log in with email and password
     POST   /api/auth/refresh             new access token, using the refresh cookie (204 if there is no cookie)
     POST   /api/auth/logout              end this session
-    GET    /api/auth/demo-accounts       test accounts for the login page (from the DEMO_LOGINS setting)
 
     GET    /api/users/me                 my profile                   (needs login)
     PATCH  /api/users/me                 change my name               (needs login)
@@ -21,7 +20,7 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from sqlmodel import Session
 
-from app.config import COOKIE_SECURE, REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH, REFRESH_TOKEN_DAYS, get_demo_logins
+from app.config import COOKIE_SECURE, REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH, REFRESH_TOKEN_DAYS
 from app.database import get_db
 from app.users import service
 from app.users.dependencies import get_current_session, get_current_user
@@ -92,12 +91,6 @@ def refresh(request: Request, response: Response, db: Session = Depends(get_db),
         clear_refresh_cookie(answer)
         return answer
     return send_tokens(response, result)
-
-
-@auth_router.get("/demo-accounts")
-def demo_accounts():
-    """The test accounts for the instructor. Empty unless DEMO_LOGINS is set on the server."""
-    return get_demo_logins()
 
 
 @auth_router.post("/logout")
