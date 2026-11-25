@@ -4,12 +4,14 @@
 |---|---|
 | **Product** | LostSpot |
 | **Document** | Product Requirements Document (PRD) |
-| **Version** | 1.2 |
-| **Date** | 6 November 2026 |
+| **Version** | 1.3 |
+| **Date** | 19 November 2026 |
 | **Author** | Rifat |
 | **Related docs** | [SRS](02-srs.md) · [TDD](03-tdd.md) |
 
 ---
+
+> **Note:** this is the planning document from the start of the course. The finished project (accounts, roles, groups, admin dashboard) is described in [FINAL_REPORT.md](FINAL_REPORT.md), which is the up-to-date version.
 
 ## 1. Overview
 
@@ -30,7 +32,7 @@ The product is built in two releases. Every feature, story and milestone in this
 | Release | When | Tag | Focus |
 |---|---|---|---|
 | **MVP** | Demo before mid-term | `v0.1.0` | Lost and found item CRUD: post an item with its location and date, list, search, view, edit, mark returned, delete. No accounts. |
-| **Beta** | Demo before final | `v0.2.0` | Accounts with university email, building floor maps with pins and areas, claim flow with a verification question, match suggestions, photos, admin dashboard and moderation, security hardening. |
+| **Beta** | Demo before final | `v0.2.0` | Accounts (sign up, log in, profile, password), building floor maps with pins and areas, claim flow with a verification question, match suggestions, photos, admin dashboard and moderation, security hardening. |
 
 ```mermaid
 flowchart LR
@@ -55,7 +57,7 @@ On most campuses, lost and found happens in social media groups, chat groups, or
 | G-02 | Keep one list of every lost and found item on campus, newest first, that can be filtered. | MVP |
 | G-03 | Let posts be corrected, marked as returned when the item is back with its owner, and deleted. | MVP |
 | G-08 | Place items on building floor maps, so people can check the exact area they were in. | Beta |
-| G-04 | Tie posts to verified university accounts to reduce spam and fake posts. | Beta |
+| G-04 | Tie posts to accounts to reduce spam and fake posts. | Beta |
 | G-05 | Reduce false claims with a hidden verification question on found items. | Beta |
 | G-06 | Suggest likely matches between lost and found items automatically. | Beta |
 | G-07 | Give admins (for example the security desk) tools to moderate posts and users. | Beta |
@@ -76,7 +78,7 @@ On most campuses, lost and found happens in social media groups, chat groups, or
 | Release | In scope |
 |---|---|
 | **MVP** | Lost and found item posts with type, title, location (text), date, description and contact; create, list, view, edit, delete; mark returned or not returned; filter by lost or found; search by name, place or description; hide returned items; no accounts; deployment on Vercel with Supabase PostgreSQL. |
-| **Beta** | Sign up and login with a university email (JWT and refresh token); profile (change name and password); "my posts"; `user` and `admin` roles; buildings and floors with floor maps (pins for found items, areas for lost items); categories and search; photo upload; verification question and claim flow on found items; match suggestions; admin dashboard with stats; remove posts; ban and unban users; add buildings and floor plans; rate limiting, login lockout and other security hardening. |
+| **Beta** | Sign up and login with any email (JWT and refresh token); profile (change name and password); "my posts"; `user` and `admin` roles; buildings and floors with floor maps (pins for found items, areas for lost items); categories and search; photo upload; verification question and claim flow on found items; match suggestions; admin dashboard with stats; remove posts; ban and unban users; add buildings and floor plans; rate limiting, login lockout and other security hardening. |
 
 ### 6.2 Out of scope (this semester)
 
@@ -101,7 +103,7 @@ Priority uses MoSCoW: **M**ust, **S**hould, **C**ould, **W**on't (this semester)
 | F-06 | Delete an item, after a confirmation | Must | MVP |
 | F-07 | Filter by lost or found, search by name, place or description, and hide returned items | Should | MVP |
 | F-08 | Building floor maps with pins (found) and areas (lost), categories and search | Must | Beta |
-| F-09 | Sign up / login with university email, JWT + refresh token | Must | Beta |
+| F-09 | Sign up / login with email, JWT + refresh token | Must | Beta |
 | F-10 | Profile: change name and password, see my posts | Must | Beta |
 | F-11 | Roles `user` / `admin` | Must | Beta |
 | F-12 | Verification question and claim flow on found items | Must | Beta |
@@ -134,7 +136,7 @@ Priority uses MoSCoW: **M**ust, **S**hould, **C**ould, **W**on't (this semester)
 
 | ID | User story |
 |---|---|
-| US-10 | As a student, I want to sign up with my university email, so that only campus members can post. |
+| US-10 | As a student, I want to sign up with my email, so that my posts and details are tied to me. |
 | US-11 | As a user, I want to log in and stay logged in, so that I don't have to sign in every time. |
 | US-12 | As a user, I want to change my name and password, so that my account stays correct and secure. |
 | US-13 | As a user, I want to see all my posts in one place, and only I (or an admin) can change them, so that strangers can't edit or delete my posts. |

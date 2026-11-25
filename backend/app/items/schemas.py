@@ -1,5 +1,5 @@
 """
-What the API accepts and what it sends back.
+What the item routes accept and send back.
 
 FastAPI checks every request against these classes. If something is wrong
 (for example an empty item name), it answers with 422 before our code even runs.
@@ -11,8 +11,8 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 
-class ItemCreate(BaseModel):
-    """Body for POST /api/items"""
+class ItemFields(BaseModel):
+    """The fields you fill in on the form."""
 
     kind: Literal["lost", "found"]
     item_name: str = Field(min_length=1, max_length=100)
@@ -37,10 +37,22 @@ class ItemCreate(BaseModel):
         return value.strip()
 
 
-class ItemUpdate(ItemCreate):
+class ItemCreate(ItemFields):
+    """Body for POST /api/items. group_id is set when posting into a group."""
+
+    group_id: int | None = None
+
+
+class ItemUpdate(ItemFields):
     """Body for PUT /api/items/{id}: the whole item, plus whether it has been returned."""
 
     is_returned: bool
+
+
+class AssignRequest(BaseModel):
+    """Body for PUT /api/items/{id}/assign. null = nobody."""
+
+    user_id: int | None
 
 
 class ItemResponse(BaseModel):
@@ -54,5 +66,12 @@ class ItemResponse(BaseModel):
     date_happened: date
     contact: str | None
     is_returned: bool
+    owner_id: int | None
+    owner_name: str | None
+    group_id: int | None
+    group_name: str | None
+    assigned_to_id: int | None
+    assigned_to_name: str | None
+    allowed: list[str]  # what the person asking may do with it: "update", "delete", "assign"
     created_at: datetime
     updated_at: datetime

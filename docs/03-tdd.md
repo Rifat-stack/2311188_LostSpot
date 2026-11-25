@@ -4,12 +4,14 @@
 |---|---|
 | **Product** | LostSpot |
 | **Document** | Technical Design Document (TDD) |
-| **Version** | 1.2 |
-| **Date** | 6 November 2026 |
+| **Version** | 1.3 |
+| **Date** | 19 November 2026 |
 | **Author** | Rifat |
 | **Related docs** | [PRD](01-prd.md) · [SRS](02-srs.md) |
 
 ---
+
+> **Note:** this is the planning document from the start of the course. The finished project (accounts, roles, groups, admin dashboard) is described in [FINAL_REPORT.md](FINAL_REPORT.md), which is the up-to-date version.
 
 ## 1. Overview
 
@@ -24,12 +26,12 @@ This document explains how LostSpot is built: the stack, the architecture, the d
 | Database | Supabase PostgreSQL (production), SQLite (local) | MVP | Free hosted Postgres; SQLite needs no setup locally |
 | Frontend | React + TypeScript + Vite | MVP | Fast dev server, typed API calls |
 | UI library | Bootstrap 5 with React-Bootstrap, plus my own CSS (sidebar layout, Poppins font, teal theme) | MVP | Ready-made forms, slide-in panel (Offcanvas), confirm dialog and alerts; widely taught |
-| Routing | React Router | MVP | One page per URL (`/` and `/items/:id`) |
+| Routing | React Router | MVP | One page per URL (`/`, `/items/:id`, `/login`, `/signup`, `/profile`) |
 | Floor map | Leaflet (`react-leaflet`) with `CRS.Simple` and an image overlay | Beta | Treats a floor plan image as a flat map with zoom, pins and circles |
 | Hosting | Vercel (static frontend + Python serverless function for `/api/*`) | MVP | Free, deploys from GitHub |
 | Migrations | Alembic | Beta | Safe schema changes once real data exists |
-| Auth | PyJWT (access + refresh tokens) | Beta | Simple, stateless access tokens |
-| Password hashing | Argon2 (`argon2-cffi`) | Beta | Current recommended password hash |
+| Auth | PyJWT for the access token, a random string for the refresh token | Beta (built) | Simple, stateless access tokens |
+| Password hashing | Argon2id through `pwdlib[argon2]` | Beta (built) | Current recommended password hash |
 | File storage | Supabase Storage | Beta | Item photos and floor plan uploads |
 
 ## 3. Architecture
@@ -86,7 +88,7 @@ sequenceDiagram
     API-->>UI: 200 {"message": "Item 5 deleted"}
 ```
 
-### 3.3 Login and refresh (Beta)
+### 3.3 Login and refresh (Beta, built in issue #7)
 
 ```mermaid
 sequenceDiagram
@@ -96,16 +98,18 @@ sequenceDiagram
     participant DB as PostgreSQL
     U->>UI: Email + password
     UI->>API: POST /api/auth/login
-    API->>DB: Find user, check ban and lockout
+    API->>DB: Find user, check lockout
     API->>API: Verify Argon2 hash
     API->>DB: Save refresh token hash
     API-->>UI: access_token (15 min) + refresh_token (7 days)
     Note over UI,API: Later, access token expires
     UI->>API: POST /api/auth/refresh
-    API->>DB: Check hash, not revoked, not expired, user not banned
+    API->>DB: Check hash, not revoked, not expired
     API->>DB: Revoke old, save new refresh token hash
     API-->>UI: New token pair
 ```
+
+In the browser, `api/auth.ts` keeps both tokens in `localStorage`. Every request that needs login sends the access token. If the answer is `401`, it calls refresh once and repeats the request; if refresh also fails, the tokens are forgotten and the user is logged out. Two requests that hit an expired token at the same time share one refresh call, because a refresh token only works once.
 
 ### 3.4 Claim a found item (Beta)
 
@@ -131,10 +135,10 @@ sequenceDiagram
 ```
 lostspot/
 ├── backend/
-│   ├── main.py                 # Creates the FastAPI app, adds the item routes, creates the tables
+│   ├── main.py                 # Creates the FastAPI app, adds the item and account routes, creates the tables
 │   ├── requirements.txt
 │   └── app/
-│       ├── config.py           # Picks the database: DATABASE_URL (Supabase) or a local SQLite file
+│       ├── config.py           # Picks the database (DATABASE_URL or SQLite), login settings, get_jwt_secret()
 │       ├── database.py         # The engine, create_tables() and get_db() (one session per request)
 │       └── items/
 │           ├── models.py       # The `items` table
@@ -143,15 +147,25 @@ lostspot/
 │           ├── service.py      # Rules: check_date, add_item, edit_item, delete_item
 │           ├── dependencies.py # get_item_or_404: loads the item for routes with {item_id}
 │           └── router.py       # The five routes under /api/items
+│       └── users/
+│           ├── models.py       # The `users` and `refresh_tokens` tables
+│           ├── schemas.py      # SignUpRequest, LoginRequest, RefreshRequest, ProfileUpdate, PasswordChange, UserResponse, TokenResponse
+│           ├── security.py     # Argon2id hashing, making and reading the JWT, making and hashing refresh tokens
+│           ├── repository.py   # find_user_by_email, find_user_by_id, save_user, refresh token queries
+│           ├── service.py      # Rules: sign_up, log_in (with lockout), refresh (rotation), log_out, update_profile, change_password
+│           ├── dependencies.py # get_current_user: reads "Authorization: Bearer ..." and loads the user, or 401
+│           └── router.py       # /api/auth/... and /api/users/me routes
 ├── frontend/
 │   └── src/
-│       ├── main.tsx            # Starts React, loads Bootstrap's CSS, turns on the router
+│       ├── main.tsx            # Starts React, loads Bootstrap's CSS, turns on the router and AuthProvider
+│       ├── AuthContext.tsx     # Who is logged in, shared with every page (useAuth)
 │       ├── App.tsx             # Picks the page for the URL
 │       ├── api/items.ts        # One function per API call (getItems, getItem, createItem, updateItem, deleteItem)
-│       ├── types.ts            # Item and ItemFormData types
-│       ├── utils.ts            # Dates and form helpers
-│       ├── components/         # Sidebar, ItemRow, ItemFormDrawer (slide-in form)
-│       └── pages/              # HomePage (list, filters, search), ItemPage (details, edit, returned, delete)
+│       ├── api/auth.ts         # signUp, logIn, logOut, profile and password calls; keeps the tokens; refreshes them
+│       ├── types.ts            # Item, ItemFormData and User types
+│       ├── utils.ts            # Dates, form helpers and the password rule
+│       ├── components/         # Sidebar (with Log in / Sign up or "Signed in as"), ItemRow, ItemFormDrawer (slide-in form)
+│       └── pages/              # HomePage, ItemPage, LoginPage, SignupPage, ProfilePage (name, password, log out)
 ├── docs/                       # PRD, SRS, TDD
 └── vercel.json                 # /api/* -> backend, everything else -> frontend
 ```
@@ -189,6 +203,43 @@ erDiagram
 | `contact` | text (100), can be empty | Optional, shown publicly |
 | `is_returned` | true / false | `false` when created |
 | `created_at`, `updated_at` | date and time (UTC) | Set by the backend; `updated_at` changes on every update |
+
+### 5.0.1 Accounts: the `users` and `refresh_tokens` tables (built in issue #7)
+
+Items are not linked to users yet. That comes with "my posts" and ownership (FR-21, FR-22).
+
+```mermaid
+erDiagram
+    USERS ||--o{ REFRESH_TOKENS : has
+    USERS {
+        int id PK
+        string name
+        string email
+        string password_hash
+        int failed_logins
+        datetime locked_until
+        datetime created_at
+        datetime updated_at
+    }
+    REFRESH_TOKENS {
+        int id PK
+        int user_id FK
+        string token_hash
+        datetime expires_at
+        bool revoked
+        datetime created_at
+    }
+```
+
+| Column | Rules |
+|---|---|
+| `users.email` | Unique, saved in lowercase |
+| `users.password_hash` | Argon2id hash; the password itself is never saved |
+| `users.failed_logins`, `users.locked_until` | Wrong passwords in a row, and the time the lock ends (empty when not locked) |
+| `refresh_tokens.token_hash` | SHA-256 of the refresh token, unique; the token itself is only in the browser |
+| `refresh_tokens.revoked` | `true` once the token has been used, after logout, or after a password change |
+
+The full Beta design below still uses `app_user` and `refresh_token`; the built tables are named `users` and `refresh_tokens`, and `role` and `is_banned` will be added with the admin features.
 
 ### 5.1 Beta ERD
 
@@ -367,17 +418,19 @@ Update uses `PUT`, so the frontend sends every field (it already has them all in
 
 ### 8.2 Beta endpoints
 
-From Beta on, item endpoints need a logged-in user. "Owner" means the user who created that item.
+From Beta on, item endpoints need a logged-in user. "Owner" means the user who created that item. All paths start with `/api`.
+
+Built so far (issue #7): the first seven rows, the account endpoints. Register, login, refresh and password change all answer with `access_token`, `refresh_token` and `user`.
 
 | Method | Path | Who can call | Description |
 |---|---|---|---|
-| `POST` | `/auth/register` | Guest | Create account (allowed email domains only) |
+| `POST` | `/auth/register` | Guest | Create account (any email, one account per email) and log in |
 | `POST` | `/auth/login` | Guest | Get access and refresh tokens |
 | `POST` | `/auth/refresh` | Holder of refresh token | Rotate tokens |
-| `POST` | `/auth/logout` | User | Revoke refresh token |
+| `POST` | `/auth/logout` | Holder of refresh token | Revoke refresh token |
 | `GET` | `/users/me` | User | Own profile |
 | `PATCH` | `/users/me` | User | Change name |
-| `POST` | `/users/me/password` | User | Change password |
+| `PUT` | `/users/me/password` | User | Change password (current one needed); logs out other devices |
 | `GET` | `/users/me/items` | User | Own items |
 | `POST` | `/items` | User | Create item (optional `verification_question`, `secret_answer` for found items) |
 | `PATCH` | `/items/{id}` | Owner, admin | Update item |
@@ -408,19 +461,22 @@ From Beta on, item endpoints need a logged-in user. "Owner" means the user who c
 - Update and delete first load the item with `get_item_or_404`, so a missing id always gives a clean `404`.
 - The database URL comes from an environment variable and is never committed.
 
-### 9.2 Authentication (Beta)
+### 9.2 Authentication (Beta, built in issue #7)
 
-- Passwords hashed with Argon2id (`argon2-cffi` defaults).
-- Access token: JWT signed with HS256 using `JWT_SECRET`, claims `sub` (user id), `role`, `exp` (15 minutes). Sent as `Authorization: Bearer <token>`.
-- Refresh token: random string, 7 days. Only its SHA-256 hash is stored. Each refresh revokes the old token and issues a new one. If a revoked token is used again, all of that user's refresh tokens are revoked.
+- Passwords hashed with Argon2id (`pwdlib[argon2]`).
+- Access token: JWT signed with HS256 using `JWT_SECRET`, claims `sub` (user id) and `exp` (15 minutes). Sent as `Authorization: Bearer <token>`. `role` is added with the admin features.
+- Refresh token: random string (`secrets.token_urlsafe(32)`), 7 days. Only its SHA-256 hash is stored. Each refresh revokes the old token and issues a new one.
 - Login lockout: `failed_logins` increases on each wrong password. At 5, `locked_until = now + 15 min` and login returns `429`. A successful login resets the counter.
-- Changing a password or being banned revokes all refresh tokens.
+- Changing the password revokes all refresh tokens, then gives the current device a new pair so it stays logged in.
+- Login with an unknown email and login with a wrong password give the same message ("Wrong email or password"), so the form does not reveal which emails have accounts.
+- The frontend keeps the tokens in `localStorage`. This is simple to explain and fine for a class project; a production app would keep the refresh token in an `httpOnly` cookie.
+- Planned later: reuse detection (a revoked refresh token used again revokes all of that user's tokens) and banning (which will also revoke all refresh tokens).
 
 ### 9.3 Authorisation (Beta)
 
 FastAPI dependencies keep the checks in one place:
 
-- `get_current_user`: decodes the JWT, loads the user, rejects banned users with `403`.
+- `get_current_user` (built): reads the bearer token, decodes the JWT, loads the user, or answers `401`. Rejecting banned users with `403` comes with the admin features.
 - `get_optional_user`: same, but returns `None` for guests (used to hide contact details).
 - `require_admin`: `403` unless `role = admin`.
 - `get_owned_item`: loads the item and allows only its owner or an admin.
@@ -462,13 +518,12 @@ Each number comes from one `GROUP BY` query. With a few thousand rows this is fa
 | `DATABASE_URL` | MVP | Supabase transaction pooler URL in production. Unset locally, which uses `backend/lostspot.db` (SQLite). |
 | `POSTGRES_URL` | MVP | Added by Vercel's Supabase integration; used when `DATABASE_URL` is unset |
 | `FRONTEND_ORIGIN` | Beta | Frontend URL, used for CORS |
-| `JWT_SECRET` | Beta | Long random secret for signing tokens |
-| `ACCESS_TOKEN_MINUTES` | Beta | Default `15` |
-| `REFRESH_TOKEN_DAYS` | Beta | Default `7` |
-| `ALLOWED_EMAIL_DOMAINS` | Beta | Comma-separated list of university email domains |
+| `JWT_SECRET` | Beta (built) | Long random secret for signing tokens. Required on Vercel; locally a fixed development secret is used when it is not set. |
 | `SUPABASE_URL` | Beta | Project URL for Storage |
 | `SUPABASE_SERVICE_KEY` | Beta | Server-only key for uploads |
 | `STORAGE_BUCKET` | Beta | Bucket name for photos and floor plans |
+
+The token lifetimes and the lockout numbers are constants in `app/config.py` (`ACCESS_TOKEN_MINUTES = 15`, `REFRESH_TOKEN_DAYS = 7`, `MAX_FAILED_LOGINS = 5`, `LOCK_MINUTES = 15`).
 
 Secrets go in a local `.env` file (listed in `.gitignore`) and in Vercel's project environment variables. They are never committed.
 
@@ -497,7 +552,7 @@ Secrets go in a local `.env` file (listed in `.gitignore`) and in Vercel's proje
 |---|---|---|
 | Floor plans are inaccurate or slow to draw | Pins land in the wrong place | Keep plans simple, start with one building and two floors |
 | No accounts in the MVP | Anyone can edit or delete any post | Accepted for the demo; Beta adds login and ownership checks |
-| Spam or fake posts in the MVP | Map gets cluttered | Accepted for the demo; Beta requires university login and rate limits |
+| Spam or fake posts in the MVP | Map gets cluttered | Accepted for the demo; Beta requires login and rate limits |
 | False claims | Item goes to the wrong person | Verification question, one claim per user, finder approves manually |
 | Contact details exposed | Privacy issue | Optional in MVP with a warning; Beta hides contact from guests |
 | Serverless cold starts on Vercel | First request is slow | Small dependency list; accept for a class project |

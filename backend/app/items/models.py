@@ -4,13 +4,11 @@ The database table for lost and found posts.
 Each row in the `items` table is one post: something someone lost, or something someone found.
 """
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 
 from sqlmodel import Field, SQLModel
 
-
-def now_utc() -> datetime:
-    return datetime.now(timezone.utc)
+from app.helpers import now_utc
 
 
 class Item(SQLModel, table=True):
@@ -24,5 +22,11 @@ class Item(SQLModel, table=True):
     date_happened: date                                      # the day it was lost or found
     contact: str | None = Field(default=None, max_length=100)
     is_returned: bool = Field(default=False)                 # True once the item is back with its owner
+
+    # Who it belongs to (posts from before accounts existed have no owner)
+    owner_id: int | None = Field(default=None, foreign_key="users.id", index=True)
+    group_id: int | None = Field(default=None, foreign_key="groups.id", index=True)
+    assigned_to_id: int | None = Field(default=None, foreign_key="users.id")
+
     created_at: datetime = Field(default_factory=now_utc)
     updated_at: datetime = Field(default_factory=now_utc)
