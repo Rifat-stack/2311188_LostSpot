@@ -3,7 +3,7 @@
 
 import { useState, type FormEvent } from "react"
 import { Alert, Button, Form, Offcanvas } from "react-bootstrap"
-import type { ItemFormData } from "../types"
+import type { Group, ItemFormData } from "../types"
 import { todayString } from "../utils"
 
 interface Props {
@@ -13,15 +13,16 @@ interface Props {
   isEditing: boolean
   onClose: () => void
   onSave: (form: ItemFormData) => Promise<void>
+  groups?: Group[] // groups the user may post in (only when creating)
 }
 
-export default function ItemFormDrawer({ show, title, startValues, isEditing, onClose, onSave }: Props) {
+export default function ItemFormDrawer({ show, title, startValues, isEditing, onClose, onSave, groups = [] }: Props) {
   const [form, setForm] = useState<ItemFormData>(startValues)
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
 
   // Update one field of the form when the user types
-  function updateField(field: keyof ItemFormData, value: string | boolean) {
+  function updateField(field: keyof ItemFormData, value: string | boolean | number | null) {
     setForm({ ...form, [field]: value })
   }
 
@@ -55,14 +56,14 @@ export default function ItemFormDrawer({ show, title, startValues, isEditing, on
               className={`kind-option lost ${form.kind === "lost" ? "selected" : ""}`}
               onClick={() => updateField("kind", "lost")}
             >
-              😟 I lost it
+              I lost it
             </button>
             <button
               type="button"
               className={`kind-option found ${form.kind === "found" ? "selected" : ""}`}
               onClick={() => updateField("kind", "found")}
             >
-              🙌 I found it
+              I found it
             </button>
           </div>
 
@@ -121,6 +122,24 @@ export default function ItemFormDrawer({ show, title, startValues, isEditing, on
             />
             <Form.Text>Everyone on LostSpot can see this.</Form.Text>
           </Form.Group>
+
+          {/* Post it just for me, or into one of my groups */}
+          {!isEditing && groups.length > 0 && (
+            <Form.Group className="mb-4" controlId="group_id">
+              <Form.Label>Post as</Form.Label>
+              <Form.Select
+                value={form.group_id ?? ""}
+                onChange={(e) => updateField("group_id", e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">Just me (a personal post)</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    Group: {group.name}
+                  </option>
+                ))}
+              </Form.Select>
+            </Form.Group>
+          )}
 
           {isEditing && (
             <Form.Check

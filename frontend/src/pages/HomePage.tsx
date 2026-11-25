@@ -1,12 +1,16 @@
 // Home page: the sidebar with buttons and filters on the left, the feed of items on the right.
+// Anyone can read the feed. Posting needs a login.
 
 import { useEffect, useState, type FormEvent } from "react"
 import { Alert, Form, Spinner } from "react-bootstrap"
+import { useNavigate } from "react-router"
+import { useAuth } from "../AuthContext"
+import { getMyGroups } from "../api/groups"
 import { createItem, getItems } from "../api/items"
 import ItemFormDrawer from "../components/ItemFormDrawer"
 import ItemRow from "../components/ItemRow"
-import Sidebar from "../components/Sidebar"
-import type { Item, ItemFormData, Kind } from "../types"
+import Layout from "../components/Layout"
+import type { Group, Item, ItemFormData, Kind } from "../types"
 import { emptyForm } from "../utils"
 
 // The three choices in the "Show" filter
@@ -17,6 +21,9 @@ const SHOW_OPTIONS: { value: Kind | "all"; label: string }[] = [
 ]
 
 export default function HomePage() {
+  const { user } = useAuth()
+  const navigate = useNavigate()
+
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -25,11 +32,12 @@ export default function HomePage() {
   // Filters
   const [kind, setKind] = useState<Kind | "all">("all")
   const [searchText, setSearchText] = useState("") // what is typed in the box
-  const [search, setSearch] = useState("")         // what we actually searched for
+  const [search, setSearch] = useState("") // what we actually searched for
   const [hideReturned, setHideReturned] = useState(false)
 
-  // Which form is open: "lost", "found" or none (null)
+  // Which form is open: "lost", "found" or none (null), and the groups I may post in
   const [formKind, setFormKind] = useState<Kind | null>(null)
+  const [postableGroups, setPostableGroups] = useState<Group[]>([])
 
   // Load the items from the backend. Runs when the page opens and whenever a filter changes.
   useEffect(() => {
@@ -46,10 +54,21 @@ export default function HomePage() {
     setSearch(searchText)
   }
 
-  // Called by the form when the user clicks "Post it"
+  // "I lost / I found something": guests are sent to the login page first
+  function openForm(newKind: Kind) {
+    if (!user) {
+      navigate("/login", { state: { from: "/" } })
+      return
+    }
+    setFormKind(newKind)
+    getMyGroups()
+      .then((groups) => setPostableGroups(groups.filter((group) => group.my_permissions.includes("create"))))
+      .catch(() => setPostableGroups([]))
+  }
+
   async function handleCreate(form: ItemFormData) {
     const newItem = await createItem(form) // if this fails, the form shows the error
-    setItems([newItem, ...items])          // put the new item at the top of the feed
+    setItems([newItem, ...items]) // put the new item at the top of the feed
     setFormKind(null)
     setSuccess(`"${newItem.item_name}" is now on LostSpot.`)
   }
@@ -57,78 +76,81 @@ export default function HomePage() {
   // "Hide returned" is done here in the browser; the other filters are done by the backend
   const visibleItems = hideReturned ? items.filter((item) => !item.is_returned) : items
 
+  const sidebar = (
+    <>
+      <button className="report-btn lost" onClick={() => openForm("lost")}>
+        I lost something
+      </button>
+      <button className="report-btn found" onClick={() => openForm("found")}>
+        I found something
+      </button>
+
+      <p className="sidebar-label">Show</p>
+      {SHOW_OPTIONS.map((option) => (
+        <button
+          key={option.value}
+          className={`filter-btn ${kind === option.value ? "active" : ""}`}
+          onClick={() => setKind(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+
+      <Form.Check
+        id="hide-returned"
+        type="switch"
+        className="sidebar-switch"
+        label="Hide returned items"
+        checked={hideReturned}
+        onChange={(e) => setHideReturned(e.target.checked)}
+      />
+    </>
+  )
+
   return (
-    <div className="layout">
-      <Sidebar>
-        <button className="report-btn lost" onClick={() => setFormKind("lost")}>
-          😟 I lost something
-        </button>
-        <button className="report-btn found" onClick={() => setFormKind("found")}>
-          🙌 I found something
-        </button>
-
-        <p className="sidebar-label">Show</p>
-        {SHOW_OPTIONS.map((option) => (
-          <button
-            key={option.value}
-            className={`filter-btn ${kind === option.value ? "active" : ""}`}
-            onClick={() => setKind(option.value)}
-          >
-            {option.label}
-          </button>
-        ))}
-
-        <Form.Check
-          id="hide-returned"
-          type="switch"
-          className="sidebar-switch"
-          label="Hide returned items"
-          checked={hideReturned}
-          onChange={(e) => setHideReturned(e.target.checked)}
+    <Layout sidebar={sidebar}>
+      <form className="search-box" onSubmit={handleSearch}>
+        <input
+          placeholder="Search for a key, a bag, a place..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          aria-label="Search"
         />
-      </Sidebar>
+        <button type="submit">Search</button>
+      </form>
 
-      <main className="content">
-        <form className="search-box" onSubmit={handleSearch}>
-          <span>🔍</span>
-          <input
-            placeholder="Search for a key, a bag, a place..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            aria-label="Search"
-          />
-          <button type="submit">Search</button>
-        </form>
+      {!user && (
+        <Alert variant="light" className="border">
+          Anyone can look through the posts. <a href="/login">Log in</a> or <a href="/signup">sign up</a> to post your own.
+        </Alert>
+      )}
+      {success && (
+        <Alert variant="success" dismissible onClose={() => setSuccess("")}>
+          {success}
+        </Alert>
+      )}
+      {error && <Alert variant="danger">{error}</Alert>}
 
-        {success && (
-          <Alert variant="success" dismissible onClose={() => setSuccess("")}>
-            {success}
-          </Alert>
-        )}
-        {error && <Alert variant="danger">{error}</Alert>}
+      <div className="feed-header">
+        <h2>{search ? `Results for "${search}"` : "Latest posts"}</h2>
+        <span>{visibleItems.length} item(s)</span>
+      </div>
 
-        <div className="feed-header">
-          <h2>{search ? `Results for "${search}"` : "Latest posts"}</h2>
-          <span>{visibleItems.length} item(s)</span>
+      {loading ? (
+        <div className="text-center my-5">
+          <Spinner animation="border" />
         </div>
-
-        {loading ? (
-          <div className="text-center my-5">
-            <Spinner animation="border" />
-          </div>
-        ) : visibleItems.length === 0 ? (
-          <div className="empty-feed">
-            <p className="empty-icon">🧐</p>
-            <p>Nothing here yet. Lost or found something? Post it with the buttons on the left.</p>
-          </div>
-        ) : (
-          <div className="feed">
-            {visibleItems.map((item) => (
-              <ItemRow key={item.id} item={item} />
-            ))}
-          </div>
-        )}
-      </main>
+      ) : visibleItems.length === 0 ? (
+        <div className="empty-feed">
+          <p>Nothing here yet. Lost or found something? Post it with the buttons on the left.</p>
+        </div>
+      ) : (
+        <div className="feed">
+          {visibleItems.map((item) => (
+            <ItemRow key={item.id} item={item} />
+          ))}
+        </div>
+      )}
 
       {/* The slide-in form. It only exists while it is open, so it starts empty each time. */}
       {formKind && (
@@ -137,10 +159,11 @@ export default function HomePage() {
           title={formKind === "lost" ? "Report a lost item" : "Report a found item"}
           startValues={{ ...emptyForm(), kind: formKind }}
           isEditing={false}
+          groups={postableGroups}
           onClose={() => setFormKind(null)}
           onSave={handleCreate}
         />
       )}
-    </div>
+    </Layout>
   )
 }

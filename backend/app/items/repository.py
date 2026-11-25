@@ -1,7 +1,7 @@
 """
 All database queries for items.
 
-Only this file talks to the database. The service calls these functions
+Only this file talks to the database about items. The service calls these functions
 and never writes queries itself.
 """
 
@@ -10,12 +10,21 @@ from sqlmodel import Session, or_, select
 from app.items.models import Item
 
 
-def find_items(db: Session, kind: str | None = None, search: str | None = None) -> list[Item]:
+def find_items(
+    db: Session,
+    kind: str | None = None,
+    search: str | None = None,
+    group_id: int | None = None,
+    owner_id: int | None = None,
+) -> list[Item]:
     query = select(Item)
 
-    # Only lost items or only found items
-    if kind:
+    if kind:  # only lost items or only found items
         query = query.where(Item.kind == kind)
+    if group_id is not None:  # only the items of one group
+        query = query.where(Item.group_id == group_id)
+    if owner_id is not None:  # only one person's items
+        query = query.where(Item.owner_id == owner_id)
 
     # Look for the search word in the name, location or description (not case sensitive)
     if search:
@@ -28,8 +37,7 @@ def find_items(db: Session, kind: str | None = None, search: str | None = None) 
             )
         )
 
-    # Newest posts first
-    query = query.order_by(Item.created_at.desc())
+    query = query.order_by(Item.created_at.desc())  # newest posts first
     return list(db.exec(query).all())
 
 

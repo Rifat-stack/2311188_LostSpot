@@ -12,13 +12,16 @@ export default function ItemRow({ item }: { item: Item }) {
 
       <span className="item-main">
         <span className="item-name">{item.item_name}</span>
-        <span className="item-place">📍 {item.location}</span>
+        <span className="item-place">
+          {item.location}
+          {item.group_name && <> · {item.group_name}</>}
+        </span>
       </span>
 
       <span className="item-side">
         <span className={`kind-tag ${item.kind}`}>{item.kind === "lost" ? "Lost" : "Found"}</span>
         <span className="item-date">{formatDate(item.date_happened)}</span>
-        {item.is_returned && <span className="returned-tag">✓ Returned</span>}
+        {item.is_returned && <span className="returned-tag">Returned</span>}
       </span>
     </Link>
   )
