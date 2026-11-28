@@ -6,7 +6,7 @@ from datetime import date
 
 from tests.conftest import new_account
 
-ITEM = {"kind": "lost", "item_name": "Blue bottle", "location": "Library", "date_happened": str(date.today())}
+ITEM = {"kind": "lost", "item_name": "Blue bottle", "location": "Room 6013", "date_happened": str(date.today())}
 
 
 def test_normal_user_cannot_open_the_admin_dashboard(client):

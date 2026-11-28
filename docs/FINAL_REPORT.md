@@ -131,7 +131,7 @@ This part lists what the system must do, written so that each line can be tested
 
 | ID | Requirement |
 |---|---|
-| FR-12 | Anyone can list, search and open posts. Posting needs a login. |
+| FR-12 | Anyone can list, search and open posts. Posting needs a login. The place is picked on a map of the 5th floor of the Academic Building, and only those places are accepted (`422` otherwise). |
 | FR-13 | A post belongs to the user who made it. Only that user, an admin, or a group member with the right permission can change it. Anyone else gets `403`. |
 | FR-14 | A user can list only their own posts (`/api/items/mine`). |
 | FR-15 | A user can create a group and becomes its owner. |
@@ -536,7 +536,6 @@ flowchart LR
 | `PASSWORD_PEPPER` | added to passwords before hashing |
 | `FRONTEND_ORIGINS` | allowed origin for CORS (the Vercel URL) |
 | `ACCESS_TOKEN_MINUTES` | optional, 15 at most (set to 1 only to film token expiry) |
-| `DEMO_LOGINS` | optional: the test accounts listed on the login page (`label\|email\|password;…`), so the passwords are never in the repository |
 
 ### C11. Testing
 
@@ -618,6 +617,7 @@ All screenshots are taken on the deployed Vercel URL.
 | #2 | #3 | PRD, SRS, TDD and README |
 | #4 | #5, #6 | Mid-term MVP: item CRUD API and UI, then the rewrite in my own style |
 | #7 | #8 | Final project: JWT, RBAC, groups, admin dashboard, tests, this report |
+| #9 | none, uploaded straight to `main` | Picking the place on a map of the 5th floor of the Academic Building |
 
 ### E3. Limitations
 

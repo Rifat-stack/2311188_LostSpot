@@ -3,8 +3,10 @@
 
 import { useState, type FormEvent } from "react"
 import { Alert, Button, Form, Offcanvas } from "react-bootstrap"
+import { findPlace, KIND_NAMES, PLACES, type PlaceKind } from "../floorPlan"
 import type { Group, ItemFormData } from "../types"
 import { todayString } from "../utils"
+import FloorMap from "./FloorMap"
 
 interface Props {
   show: boolean
@@ -78,15 +80,31 @@ export default function ItemFormDrawer({ show, title, startValues, isEditing, on
             />
           </Form.Group>
 
+          {/* Where: only places on the 5th-floor map. Pick on the map or in the list; both stay in sync. */}
           <Form.Group className="mb-3" controlId="location">
-            <Form.Label>Where?</Form.Label>
-            <Form.Control
-              required
-              maxLength={150}
-              placeholder="CSE Building, Floor 2, near Lab 1"
-              value={form.location}
-              onChange={(e) => updateField("location", e.target.value)}
-            />
+            <Form.Label>Where on the 5th floor?</Form.Label>
+            <Form.Select required value={findPlace(form.location) ? form.location : ""} onChange={(e) => updateField("location", e.target.value)}>
+              <option value="">Pick a place on the map or here</option>
+              {(Object.keys(KIND_NAMES) as PlaceKind[]).map((kind) => (
+                <optgroup key={kind} label={KIND_NAMES[kind]}>
+                  {PLACES.filter((place) => place.kind === kind).map((place) => (
+                    <option key={place.name} value={place.name}>
+                      {place.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </Form.Select>
+            <FloorMap selected={form.location} onSelect={(name) => updateField("location", name)} />
+            <Form.Text>
+              {findPlace(form.location) ? (
+                <>
+                  Selected: <strong className="picked-place">{form.location}</strong>
+                </>
+              ) : (
+                "Tap a room or area on the map. It turns green."
+              )}
+            </Form.Text>
           </Form.Group>
 
           <Form.Group className="mb-3" controlId="date_happened">

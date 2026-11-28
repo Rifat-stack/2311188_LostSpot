@@ -365,7 +365,7 @@ body {
 /* ---------- Slide-in form ---------- */
 
 .form-drawer {
-  width: 440px !important;
+  width: 720px !important; /* wide enough for the floor map */
 }
 
 .kind-choice {
@@ -963,4 +963,120 @@ body {
   .form-drawer {
     width: 100% !important;
   }
+}
+
+/* ---------- 5th-floor map (components/FloorMap.tsx) ---------- */
+
+.floor-map {
+  margin: 10px 0 6px;
+  overflow-x: auto; /* on a phone the map keeps a readable size and scrolls sideways */
+  background: #fff;
+  border: 1px solid #d5e3e1;
+  border-radius: 12px;
+}
+
+.floor-map svg {
+  display: block;
+  width: 100%;
+  min-width: 640px;
+  height: auto;
+}
+
+.floor-map .place rect,
+.floor-map .place polygon {
+  fill: #f4f7f6;
+  stroke: #8aa3a0;
+  stroke-width: 2.5;
+  transition: fill 0.15s;
+}
+
+.floor-map .place.lab rect,
+.floor-map .place.lab polygon {
+  fill: #eef2fb;
+}
+
+.floor-map .place.corridor rect,
+.floor-map .place.corridor polygon {
+  fill: #e9eeed;
+}
+
+.floor-map .place.washroom rect {
+  fill: #eaf4fb;
+}
+
+.floor-map .place.exit rect {
+  fill: #fdecea;
+  stroke: #d9534f;
+}
+
+.floor-map .place text {
+  font: 600 22px Poppins, system-ui, sans-serif;
+  fill: #48605d;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+
+.floor-map.can-pick .place {
+  cursor: pointer;
+  outline: none;
+}
+
+.floor-map.can-pick .place:hover rect,
+.floor-map.can-pick .place:hover polygon,
+.floor-map.can-pick .place:focus-visible rect,
+.floor-map.can-pick .place:focus-visible polygon {
+  fill: #d1fae5;
+  stroke: #16a34a;
+}
+
+/* the chosen place: green (also while the mouse is over it) */
+.floor-map .place.selected rect,
+.floor-map .place.selected polygon,
+.floor-map.can-pick .place.selected:hover rect,
+.floor-map.can-pick .place.selected:hover polygon,
+.floor-map.can-pick .place.selected:focus-visible rect,
+.floor-map.can-pick .place.selected:focus-visible polygon {
+  fill: #22c55e;
+  stroke: #15803d;
+  stroke-width: 4;
+}
+
+.floor-map .place.selected text {
+  fill: #fff;
+  font-weight: 700;
+}
+
+.floor-map .atrium rect {
+  fill: #f8faf9;
+  stroke: #b9c9c6;
+  stroke-width: 2;
+  stroke-dasharray: 8 6;
+}
+
+.floor-map .atrium line {
+  stroke: #d3dedc;
+  stroke-width: 2;
+}
+
+.floor-map .map-title {
+  font: 700 30px Poppins, system-ui, sans-serif;
+  fill: #b42318;
+}
+
+.picked-place {
+  color: #15803d;
+}
+
+.detail-map {
+  margin-top: 20px;
+  padding: 20px;
+  background: #fff;
+  border-radius: 16px;
+}
+
+.detail-map h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 4px;
 }

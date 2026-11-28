@@ -8,7 +8,9 @@ import { Link, useNavigate, useParams } from "react-router"
 import { getGroup } from "../api/groups"
 import { assignItem, deleteItem, getItem, updateItem } from "../api/items"
 import ItemFormDrawer from "../components/ItemFormDrawer"
+import FloorMap from "../components/FloorMap"
 import Layout from "../components/Layout"
+import { findPlace } from "../floorPlan"
 import type { Item, ItemFormData, Member } from "../types"
 import { formatDate, itemToForm } from "../utils"
 
@@ -176,6 +178,18 @@ export default function ItemPage() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Where it happened, marked green on the floor map */}
+      {item && (
+        <section className="detail-map">
+          <h2>Where on the 5th floor</h2>
+          {findPlace(item.location) ? (
+            <FloorMap selected={item.location} />
+          ) : (
+            <p className="text-secondary mb-0">This post was made before the floor map, so its place isn't marked.</p>
+          )}
+        </section>
       )}
 
       {item && showEdit && (

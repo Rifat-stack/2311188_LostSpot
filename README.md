@@ -14,7 +14,7 @@ Made by **Rifat Abdullah Khan (2311188)** for CSE309.
 
 ## Test accounts for the instructor
 
-The passwords are given in the submission form and the report PDF, and the live login page lists the test accounts so they can be used with one click. That list comes from the `DEMO_LOGINS` setting on Vercel, so no password is written in this repository.
+The login page lists the test accounts (two admins and two users) with their demo passwords, so they can be copied straight into the form. All five accounts and their passwords are also in the submission form and the report PDF.
 
 | User ID (email) | Role | In the shared group |
 |---|---|---|
@@ -40,7 +40,7 @@ Some things to try:
 **Everyone:** browse and search all posts, filter lost or found, hide returned items.
 
 **Users** (sign up with any email):
-- Post a lost or found item, as a personal post or into a group
+- Post a lost or found item, as a personal post or into a group, and pick where it happened on a map of the 5th floor of the Academic Building (the chosen room turns green, and the post's page shows it on the map)
 - Edit, mark returned or delete **only their own** posts, and see them on "My posts"
 - Change their name and password, see where they are logged in, and end any of those sessions
 - Create groups and decide what each member may do
@@ -120,7 +120,7 @@ backend/
   app/database.py      database connection, and adds new columns to the old items table
   app/rbac.py          every permission rule: roles, ownership, groups
   app/users/           sign up, login, tokens, sessions, profile
-  app/items/           lost and found posts
+  app/items/           lost and found posts (places.py: the 5th-floor places a post may use)
   app/groups/          groups and members
   app/activity/        the activity log
   app/admin/           the admin dashboard API
@@ -129,7 +129,8 @@ frontend/src/
   api/client.ts        access token in memory, refresh on 401, CSV downloads
   api/*.ts             one function per endpoint
   AuthContext.tsx      who is logged in (restored from the cookie when the page opens)
-  components/          Layout, Sidebar (menu by role), Guards, ItemRow, ItemFormDrawer, Pager, AskModal
+  components/          Layout, Sidebar (menu by role), Guards, ItemRow, ItemFormDrawer, FloorMap, Pager, AskModal
+  floorPlan.ts         the rooms and areas of the 5th floor, drawn by FloorMap
   pages/               Home, Item, My posts, Groups, Group, Login, Signup, Profile
   pages/admin/         Overview, Users, User detail, Content, Activity log, Security
 docs/                  PRD, SRS, TDD, and the final report
@@ -171,4 +172,4 @@ Open http://localhost:5173. On your computer the data is saved in `backend/losts
 
 ## How I work on this repo
 
-Every change starts with a GitHub issue. I make a branch named `rifat/#<issue>-<short-title>`, write commits like `feat: add groups (#7)`, and open a pull request that says `Closes #<issue>`. After it is merged into `main`, Vercel deploys it.
+Every change starts with a GitHub issue. The mid-term work and the final project went through branches named `rifat/#<issue>-<short-title>` and pull requests that say `Closes #<issue>`. Newer changes, like the 5th-floor map (#9), are uploaded straight to `main` with GitHub's "Upload files" page, with the issue number in the commit message. Vercel deploys `main` every time it changes.

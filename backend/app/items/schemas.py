@@ -10,6 +10,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.items.places import PLACES
+
 
 class ItemFields(BaseModel):
     """The fields you fill in on the form."""
@@ -27,6 +29,13 @@ class ItemFields(BaseModel):
         value = value.strip()
         if value == "":
             raise ValueError("cannot be empty")
+        return value
+
+    @field_validator("location")
+    @classmethod
+    def must_be_on_the_map(cls, value: str) -> str:
+        if value not in PLACES:
+            raise ValueError("pick a place on the 5th-floor map")
         return value
 
     @field_validator("description", "contact")
