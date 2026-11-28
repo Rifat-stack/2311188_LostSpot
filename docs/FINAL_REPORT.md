@@ -643,4 +643,3 @@ All screenshots are taken on the deployed Vercel URL.
 | React, React Router, React-Bootstrap docs | frontend |
 | OWASP cheat sheets (authentication, session management, password storage) | security choices |
 | Course reference project (smarter-todo) | the expected level of features; no code copied |
-| AI assistant (Claude) | _Describe here honestly how you used it, as your course allows: for example, explaining concepts, suggesting and reviewing code, and drafting documents that you then checked and edited._ |
